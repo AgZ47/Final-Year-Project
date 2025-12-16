@@ -47,3 +47,12 @@ npm install
 ```
 node index.js
 ```
+
+# How to run frontend:
+
+1. open terminal in Frontend/health_app
+2. run this command directly or open android emulator using ctrl+shift+p and then running this command:
+
+```
+flutter run
+```
