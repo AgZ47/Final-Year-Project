@@ -5,6 +5,7 @@ const { dataRouter } = require("./Routes/userData");
 const { analysisRouter } = require("./Routes/analysisRouter");
 const { interventionRouter } = require("./Routes/interventionRouter");
 const { reportRouter } = require("./Routes/reportRouter");
+require("dotenv").config();
 
 const app = express();
 

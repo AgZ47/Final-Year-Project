@@ -5,8 +5,6 @@ const jwt = require("jsonwebtoken");
 
 const userauthRouter = Router();
 
-const JWT_SECRET = "HowToTrainYourDragon";
-
 //User account register logic
 userauthRouter.post("/register", async (req, res) => {
   const input = req.body;
@@ -53,7 +51,7 @@ userauthRouter.post("/login", async (req, res) => {
   res
     .status(200)
     .header({
-      token: await jwt.sign(input.email, JWT_SECRET),
+      token: await jwt.sign(input.email, process.env.JWT_KEY),
     })
     .json({
       message: "User Logged in Successfully",
