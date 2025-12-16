@@ -52,7 +52,17 @@ npm install
 node index.js
 ```
 
-<<<<<<< HEAD
+## How to push to github:
+
+1. open terminal in the root directory of the project which will be named "Final-Year-Project"
+2. run these commands replacing "commit message" with your commit message eg."updated backend routes"
+
+```
+git add .
+git commit -m "commit message"
+git push -u  origin main
+```
+
 # How to run frontend:
 
 1. open terminal in Frontend/health_app
@@ -60,14 +70,4 @@ node index.js
 
 ```
 flutter run
-=======
-## How to push to github:
-
-1. open terminal in the root directory of the project which will be named "Final-Year-Project"
-2. run these commands replacing "commit message" with your commit message eg."updated backend routes"
-```
-git add .
-git commit -m "commit message"
-git push -u  origin main
->>>>>>> fd957780bf5d27b69c71646eed943ad9a5d8ef2c
 ```
