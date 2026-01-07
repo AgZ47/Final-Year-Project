@@ -1,4 +1,5 @@
 const { Router } = require("express");
+const userAuthentication = require("./../middlewares/userAuthentication");
 
 const reportRouter = Router();
 

@@ -2,6 +2,7 @@ const { Router } = require("express");
 const z = require("zod");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const { dbclient } = require("../database/db");
 
 const userauthRouter = Router();
 
@@ -17,7 +18,7 @@ userauthRouter.post("/register", async (req, res) => {
   });
 
   try {
-    data = await z.parse(inputModel, input);
+    data = inputModel.parse(input);
   } catch (e) {
     return res.status(403).json({
       message: "failed to validate user",
@@ -26,7 +27,13 @@ userauthRouter.post("/register", async (req, res) => {
 
   //validataion success check
   input.password = await bcrypt.hash(req.body.password, 10);
-  console.log(data);
+
+  try {
+    response = await dbclient.query("SELECT * FROM users;");
+    console.log(response.rows);
+  } catch (e) {
+    console.log("failed to get response from database");
+  }
 
   return res.sendStatus(200);
 });
