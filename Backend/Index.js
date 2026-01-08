@@ -1,4 +1,5 @@
 const express = require("express");
+const cors = require("cors");
 require("dotenv").config();
 const { userauthRouter } = require("./Routes/userAuth");
 const { userRouter } = require("./Routes/userRouter");
@@ -9,6 +10,7 @@ const { reportRouter } = require("./Routes/reportRouter");
 
 const app = express();
 
+app.use(cors());
 app.use(express.json());
 
 app.use("/auth", userauthRouter); //Create account, Get JWT Token.

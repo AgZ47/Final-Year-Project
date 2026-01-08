@@ -29,13 +29,19 @@ userauthRouter.post("/register", async (req, res) => {
   input.password = await bcrypt.hash(req.body.password, 10);
 
   try {
-    response = await dbclient.query("SELECT * FROM users;");
-    console.log(response.rows);
-  } catch (e) {
-    console.log("failed to get response from database");
-  }
+    response = await dbclient.query(
+      "INSERT INTO users (username, email, passwords) VALUES ($1, $2, $3) RETURNING id",
+      [input.username, input.email, input.password]
+    );
 
-  return res.sendStatus(200);
+    return res.status(200).json({
+      token: jwt.sign(response.rows[0].id, process.env.JWT_KEY),
+    });
+  } catch (e) {
+    console.log(e);
+    console.log("failed to get response from database");
+    return res.sendStatus(400);
+  }
 });
 
 //User login logic
