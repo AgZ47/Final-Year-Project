@@ -112,7 +112,7 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               onPressed: () async {
                                 var url = Uri.http(
-                                  '10.0.2.2:3000',
+                                  'final-year-project-16rt.vercel.app',
                                   'auth/register',
                                 );
                                 var response = await http.post(
