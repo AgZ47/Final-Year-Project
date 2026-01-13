@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:ui'; // Required for ImageFilter (Frosted Glass)
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:health_app/home_page.dart';
 import 'package:http/http.dart' as http;
@@ -17,24 +17,24 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1E1E1E), // Dark background from image
+      backgroundColor: const Color(0xFFF7EBE1), // Dark background from image
       body: Stack(
         children: [
           // 1. Background decorative circles
           Positioned(
             top: 300,
             right: -50,
-            child: _buildCircle(200, const Color(0xFF1D8B8E)),
+            child: _buildCircle(200, const Color(0xff132137)),
           ),
           Positioned(
             top: 280,
             right: 100,
-            child: _buildCircle(60, const Color(0xFF1D8B8E)),
+            child: _buildCircle(60, const Color(0xff132137)),
           ),
           Positioned(
             bottom: -50,
             left: -20,
-            child: _buildCircle(180, const Color(0xFF1D8B8E)),
+            child: _buildCircle(180, const Color(0xff132137)),
           ),
 
           // 2. Main Content
@@ -47,12 +47,27 @@ class _LoginPageState extends State<LoginPage> {
                   "Aura Fit",
                   style: TextStyle(
                     fontSize: 80,
-                    color: Color(0xFF4CB6BD),
+                    color: Color(0xff132137),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+
                 const Spacer(),
 
+                Container(
+                  height:
+                      180, // Adjust this height to make the logo bigger/smaller
+                  decoration: const BoxDecoration(
+                    image: DecorationImage(
+                      image: AssetImage(
+                        'assets/aurafit_logo.png',
+                      ), // <--- CHECK FILE NAME
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+
+                const Spacer(),
                 // 3. The Glassmorphism Card
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -63,10 +78,20 @@ class _LoginPageState extends State<LoginPage> {
                       child: Container(
                         padding: const EdgeInsets.all(30),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
+                          color: const Color.fromARGB(
+                            255,
+                            236,
+                            235,
+                            238,
+                          ).withOpacity(0.1),
                           borderRadius: BorderRadius.circular(30),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.2),
+                            color: const Color.fromARGB(
+                              255,
+                              0,
+                              0,
+                              0,
+                            ).withOpacity(0.2),
                           ),
                         ),
                         child: Column(
@@ -76,7 +101,7 @@ class _LoginPageState extends State<LoginPage> {
                               "Sign Up",
                               style: TextStyle(
                                 fontSize: 32,
-                                color: Colors.white,
+                                color: Color.fromARGB(255, 35, 35, 35),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -104,7 +129,7 @@ class _LoginPageState extends State<LoginPage> {
                             // 4. Continue Button
                             ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF4CB6BD),
+                                backgroundColor: const Color(0xff132137),
                                 minimumSize: const Size(double.infinity, 50),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -198,12 +223,12 @@ class _LoginPageState extends State<LoginPage> {
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: Colors.white60, fontSize: 14),
+        labelStyle: const TextStyle(color: Color(0xff132137), fontSize: 14),
         enabledBorder: const UnderlineInputBorder(
           borderSide: BorderSide(color: Colors.white30),
         ),
         focusedBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Color(0xFF4CB6BD)),
+          borderSide: BorderSide(color: Color(0xff132137)),
         ),
       ),
     );
