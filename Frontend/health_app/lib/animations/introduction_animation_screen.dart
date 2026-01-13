@@ -1,10 +1,10 @@
-import 'package:health_app/care_view.dart';
-import 'package:health_app/center_next_button.dart';
-import 'package:health_app/mood_diary_vew.dart';
-import 'package:health_app/relax_view.dart';
-import 'package:health_app/splash_view.dart';
-import 'package:health_app/top_back_skip_view.dart';
-import 'package:health_app/welcome_view.dart';
+import 'package:health_app/animations/care_view.dart';
+import 'package:health_app/animations/center_next_button.dart';
+import 'package:health_app/animations/mood_diary_view.dart';
+import 'package:health_app/animations/relax_view.dart';
+import 'package:health_app/animations/splash_view.dart';
+import 'package:health_app/animations/top_back_skip_view.dart';
+import 'package:health_app/animations/welcome_view.dart';
 import 'package:flutter/material.dart';
 import 'package:health_app/login_page.dart';
 
@@ -17,13 +17,16 @@ class IntroductionAnimationScreen extends StatefulWidget {
 }
 
 class _IntroductionAnimationScreenState
-    extends State<IntroductionAnimationScreen> with TickerProviderStateMixin {
+    extends State<IntroductionAnimationScreen>
+    with TickerProviderStateMixin {
   AnimationController? _animationController;
 
   @override
   void initState() {
-    _animationController =
-        AnimationController(vsync: this, duration: Duration(seconds: 8));
+    _animationController = AnimationController(
+      vsync: this,
+      duration: Duration(seconds: 8),
+    );
     _animationController?.animateTo(0.0);
     super.initState();
   }
@@ -42,21 +45,11 @@ class _IntroductionAnimationScreenState
       body: ClipRect(
         child: Stack(
           children: [
-            SplashView(
-              animationController: _animationController!,
-            ),
-            RelaxView(
-              animationController: _animationController!,
-            ),
-            CareView(
-              animationController: _animationController!,
-            ),
-            MoodDiaryVew(
-              animationController: _animationController!,
-            ),
-            WelcomeView(
-              animationController: _animationController!,
-            ),
+            SplashView(animationController: _animationController!),
+            RelaxView(animationController: _animationController!),
+            CareView(animationController: _animationController!),
+            MoodDiaryView(animationController: _animationController!),
+            WelcomeView(animationController: _animationController!),
             TopBackSkipView(
               onBackClick: _onBackClick,
               onSkipClick: _onSkipClick,
@@ -73,8 +66,10 @@ class _IntroductionAnimationScreenState
   }
 
   void _onSkipClick() {
-    _animationController?.animateTo(0.8,
-        duration: Duration(milliseconds: 1200));
+    _animationController?.animateTo(
+      0.8,
+      duration: Duration(milliseconds: 1200),
+    );
   }
 
   void _onBackClick() {
