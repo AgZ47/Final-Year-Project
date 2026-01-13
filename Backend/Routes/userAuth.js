@@ -14,7 +14,7 @@ userauthRouter.post("/register", async (req, res) => {
   const inputModel = z.object({
     username: z.string().min(3).max(100),
     email: z.email(),
-    password: z.string().min(3).max(100),
+    password: z.string().min(6).max(100),
   });
 
   try {
@@ -38,9 +38,21 @@ userauthRouter.post("/register", async (req, res) => {
       token: jwt.sign(response.rows[0].id, process.env.JWT_KEY),
     });
   } catch (e) {
+    let message;
+
+    if (e.code === "23505") {
+      if (e.detail.includes("username")) {
+        message = "Username is already taken";
+      } else if (e.detail.includes("email")) {
+        message = "Email is already taken";
+      }
+
+      return res.status(409).json({ message });
+    }
+
     console.log(e);
     console.log("failed to get response from database");
-    return res.sendStatus(400);
+    return res.sendStatus(400).json({ ERROR: e });
   }
 });
 
