@@ -11,6 +11,12 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  // ==========================================
+  // 🛠️ DEVELOPMENT TOGGLE
+  // Set to true to bypass backend for UI testing
+  // ==========================================
+  final bool _isTestingMode = true;
+
   final _storage = const FlutterSecureStorage();
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
@@ -25,12 +31,10 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // This allows the body to shrink when the keyboard appears
       resizeToAvoidBottomInset: true,
       backgroundColor: const Color(0xFFF7EBE1),
       body: Stack(
         children: [
-          // Background decorative circles
           Positioned(
             top: 300,
             right: -50,
@@ -46,12 +50,9 @@ class _LoginPageState extends State<LoginPage> {
             left: -20,
             child: _buildCircle(180, const Color(0xff132137)),
           ),
-
           SafeArea(
             child: Center(
-              // Centers the card on larger screens
               child: SingleChildScrollView(
-                // CRITICAL: Makes screen scrollable when keyboard appears
                 padding: const EdgeInsets.symmetric(vertical: 20),
                 child: Form(
                   key: _formKey,
@@ -67,7 +68,6 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      // Responsive Logo Container
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxHeight: 180),
                         child: Image.asset(
@@ -76,6 +76,26 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                       const SizedBox(height: 40),
+                      // Optional Visual Indicator for Devs
+                      if (_isTestingMode)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.orangeAccent,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            "TESTING MODE ACTIVE",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
                       _buildGlassCard(),
                     ],
                   ),
@@ -193,7 +213,6 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _handleRegister() async {
-    // Reset backend errors
     setState(() {
       _backendEmailError = null;
       _backendUsernameError = null;
@@ -201,8 +220,38 @@ class _LoginPageState extends State<LoginPage> {
 
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
+
       try {
-        // Use HTTP for local dev
+        // ==========================================
+        // MOCK LOGIN LOGIC
+        // ==========================================
+        if (_isTestingMode) {
+          // Simulate network delay to test loading spinner
+          await Future.delayed(const Duration(seconds: 1));
+
+          final String testUsername = _usernameController.text.trim();
+          const String testToken = "mock_jwt_session_token_12345";
+
+          await _storage.write(key: 'user_session_token', value: testToken);
+          await _storage.write(key: 'username', value: testUsername);
+
+          if (!mounted) return;
+
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  HomePage(userSessionToken: testToken, username: testUsername),
+            ),
+            (route) => false,
+          );
+
+          return; // Exit function so real HTTP code doesn't run
+        }
+
+        // ==========================================
+        // REAL BACKEND LOGIC
+        // ==========================================
         var url = Uri.http('10.0.2.2:3000', 'auth/register');
         var response = await http.post(
           url,
@@ -242,7 +291,7 @@ class _LoginPageState extends State<LoginPage> {
             else if (msg.toLowerCase().contains("email"))
               _backendEmailError = msg;
           });
-          _formKey.currentState!.validate(); // Trigger re-render of error text
+          _formKey.currentState!.validate();
         }
       } catch (e) {
         ScaffoldMessenger.of(
