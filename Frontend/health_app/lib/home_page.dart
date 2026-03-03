@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'drawer_pages/home.dart';
-import 'drawer_pages/mental.dart';
-import 'drawer_pages/physical.dart';
-import 'drawer_pages/profile.dart';
-import 'drawer_pages/sleep.dart';
+import 'drawer_pages/home/home.dart';
+import 'drawer_pages/mental/mental.dart';
+import 'drawer_pages/physical/physical.dart';
+import 'drawer_pages/profile/profile.dart';
+import 'drawer_pages/sleep/sleep.dart';
 
 // This acts exactly like the "MainWrapper" in the tutorial
 class HomePage extends StatefulWidget {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:watch_connectivity/watch_connectivity.dart';
-import '../support_page.dart';
-import '../breathing_exercise.dart';
+import 'support_page.dart';
+import 'breathing_exercise.dart';
 
 class Home extends StatefulWidget {
   final String? userSessionToken;
