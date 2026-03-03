@@ -32,23 +32,23 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      backgroundColor: const Color(0xFFF7EBE1),
+      backgroundColor: const Color(0xFF0D1B2A),
       body: Stack(
         children: [
           Positioned(
             top: 300,
             right: -50,
-            child: _buildCircle(200, const Color(0xff132137)),
+            child: _buildCircle(200, const Color(0xFF4DD0E1)),
           ),
           Positioned(
             top: 280,
             right: 100,
-            child: _buildCircle(60, const Color(0xff132137)),
+            child: _buildCircle(60, const Color(0xFF7E57C2)),
           ),
           Positioned(
             bottom: -50,
             left: -20,
-            child: _buildCircle(180, const Color(0xff132137)),
+            child: _buildCircle(180, const Color(0xFF5C6BC0)),
           ),
           SafeArea(
             child: Center(
@@ -63,7 +63,7 @@ class _LoginPageState extends State<LoginPage> {
                         "Aura Fit",
                         style: TextStyle(
                           fontSize: 80,
-                          color: Color(0xff132137),
+                          color: Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -118,9 +118,9 @@ class _LoginPageState extends State<LoginPage> {
           child: Container(
             padding: const EdgeInsets.all(30),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withOpacity(0.05),
               borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: Colors.white.withOpacity(0.3)),
+              border: Border.all(color: const Color(0xFF4DD0E1).withOpacity(0.15)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,7 +129,7 @@ class _LoginPageState extends State<LoginPage> {
                   "Sign Up",
                   style: TextStyle(
                     fontSize: 32,
-                    color: Color(0xff132137),
+                    color: Color(0xFF4DD0E1),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -191,7 +191,7 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildSubmitButton() {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF4CB6BD),
+        backgroundColor: const Color(0xFF4DD0E1),
         minimumSize: const Size(double.infinity, 50),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
@@ -207,7 +207,7 @@ class _LoginPageState extends State<LoginPage> {
             )
           : const Text(
               "Continue",
-              style: TextStyle(fontSize: 18, color: Colors.white),
+              style: TextStyle(fontSize: 18, color: Colors.black),
             ),
     );
   }
@@ -316,20 +316,20 @@ class _LoginPageState extends State<LoginPage> {
       obscureText: isPassword,
       validator: validator,
       onChanged: onChanged,
-      style: const TextStyle(color: Color(0xff132137)),
+      style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
-        prefixIcon: Icon(icon, color: const Color(0xff132137).withOpacity(0.5)),
+        prefixIcon: Icon(icon, color: const Color(0xFF4DD0E1).withOpacity(0.5)),
         labelText: label,
-        labelStyle: const TextStyle(color: Color(0xff132137), fontSize: 14),
+        labelStyle: const TextStyle(color: Colors.white54, fontSize: 14),
         errorStyle: const TextStyle(
           color: Colors.redAccent,
           fontWeight: FontWeight.bold,
         ),
         enabledBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.black26),
+          borderSide: BorderSide(color: Colors.white12),
         ),
         focusedBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Color(0xff132137)),
+          borderSide: BorderSide(color: Color(0xFF4DD0E1)),
         ),
       ),
     );

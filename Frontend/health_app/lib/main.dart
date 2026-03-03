@@ -37,7 +37,71 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(),
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        // ── Core palette (matching sleep screen) ──
+        scaffoldBackgroundColor: const Color(0xFF0D1B2A),
+        primaryColor: const Color(0xFF4DD0E1),          // Teal accent
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF4DD0E1),                    // Teal accent
+          secondary: Color(0xFF7E57C2),                  // Purple
+          tertiary: Color(0xFF5C6BC0),                   // Indigo
+          surface: Color(0xFF152238),                    // Navy card surface
+          onPrimary: Color(0xFF0D1B2A),
+          onSecondary: Colors.white,
+          onSurface: Colors.white,
+        ),
+        // ── Navigation bar ──
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: const Color(0xFF0D1B2A),
+          indicatorColor: const Color(0xFF4DD0E1).withOpacity(0.15),
+          iconTheme: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const IconThemeData(color: Color(0xFF4DD0E1));
+            }
+            return const IconThemeData(color: Colors.white38);
+          }),
+          labelTextStyle: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const TextStyle(
+                color: Color(0xFF4DD0E1),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              );
+            }
+            return const TextStyle(color: Colors.white38, fontSize: 12);
+          }),
+        ),
+        // ── Text ──
+        textTheme: const TextTheme(
+          displayLarge: TextStyle(color: Colors.white),
+          bodyLarge: TextStyle(color: Colors.white70),
+          titleLarge: TextStyle(color: Colors.white),
+        ),
+        // ── Cards ──
+        cardTheme: CardThemeData(
+          color: const Color(0xFF152238),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: 0,
+        ),
+        // ── AppBar ──
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          foregroundColor: Colors.white,
+        ),
+        // ── Inputs ──
+        inputDecorationTheme: const InputDecorationTheme(
+          labelStyle: TextStyle(color: Colors.white54),
+          prefixIconColor: Colors.white38,
+          enabledBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: Colors.white12),
+          ),
+          focusedBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: Color(0xFF4DD0E1)),
+          ),
+        ),
+      ),
       home: FutureBuilder(
         future: _initializeApp(),
         builder: (context, snapshot) {

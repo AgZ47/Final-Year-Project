@@ -74,7 +74,7 @@ class CenterNextButton extends StatelessWidget {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(
                         8 + 32 * (1 - _signUpMoveAnimation.value)),
-                    color: Color(0xff132137),
+                    color: Color(0xFF4DD0E1),
                   ),
                   child: PageTransitionSwitcher(
                     duration: Duration(milliseconds: 480),
@@ -105,13 +105,13 @@ class CenterNextButton extends StatelessWidget {
                                   Text(
                                     'Sign Up',
                                     style: TextStyle(
-                                      color: Colors.white,
+                                      color: Colors.black,
                                       fontSize: 18,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
                                   Icon(Icons.arrow_forward_rounded,
-                                      color: Colors.white),
+                                      color: Colors.black),
                                 ],
                               ),
                             ),
@@ -122,7 +122,7 @@ class CenterNextButton extends StatelessWidget {
                             child: Padding(
                               padding: EdgeInsets.all(16.0),
                               child: Icon(Icons.arrow_forward_ios_rounded,
-                                  color: Colors.white),
+                                  color: Colors.black),
                             ),
                           ),
                   ),
@@ -148,7 +148,7 @@ class CenterNextButton extends StatelessWidget {
                   Text(
                     'Login',
                     style: TextStyle(
-                      color: Color(0xff132137),
+                      color: Color(0xFF4DD0E1),
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -188,8 +188,8 @@ class CenterNextButton extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(32),
                   color: _selectedIndex == i
-                      ? Color(0xff132137)
-                      : Color(0xffE3E4E4),
+                      ? Color(0xFF4DD0E1)
+                      : Color(0xFF333333),
                 ),
                 width: 10,
                 height: 10,
