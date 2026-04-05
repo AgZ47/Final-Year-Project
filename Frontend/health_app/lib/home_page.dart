@@ -35,8 +35,12 @@ class _HomePageState extends State<HomePage> {
   static const _purple = Color(0xFF7E57C2);
 
   // All navigable pages (bottom nav + drawer-only)
-  final List<Widget> _pages = [
-    const Home(), // 0 - Home
+  late final List<Widget> _pages = [
+    Home(
+      userSessionToken: widget.userSessionToken,
+      username: widget.username,
+      onNavigate: _navigateToPage, // Passed down for Quick Actions
+    ),
     const Sleep(), // 1 - Sleep
     const Physical(), // 2 - Physical
     const Mental(), // 3 - Mental
@@ -50,9 +54,9 @@ class _HomePageState extends State<HomePage> {
     const InsightsPage(), // 11 - Insights
   ];
 
+  // ⚡ FIXED: Removed Navigator.pop from here
   void _navigateToPage(int index) {
     setState(() => _selectedIndex = index);
-    Navigator.pop(context); // close drawer
   }
 
   @override
@@ -117,12 +121,14 @@ class _HomePageState extends State<HomePage> {
                       shape: BoxShape.circle,
                       gradient: LinearGradient(colors: [_accent, _purple]),
                     ),
-                    child: const CircleAvatar(
+                    child: CircleAvatar(
                       radius: 30,
-                      backgroundColor: Color(0xFF1A2A40),
+                      backgroundColor: const Color(0xFF1A2A40),
                       child: Text(
-                        'AJ',
-                        style: TextStyle(
+                        widget.username.isNotEmpty
+                            ? widget.username.substring(0, 1).toUpperCase()
+                            : 'U',
+                        style: const TextStyle(
                           color: _accent,
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
@@ -131,9 +137,9 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  const Text(
-                    'Alex Johnson',
-                    style: TextStyle(
+                  Text(
+                    widget.username,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -141,7 +147,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Synergy AI',
+                    'Aura Fit',
                     style: TextStyle(
                       color: _accent.withOpacity(0.8),
                       fontSize: 13,
@@ -190,7 +196,7 @@ class _HomePageState extends State<HomePage> {
             Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
-                'Synergy AI v2.0',
+                'Aura Fit v2.0',
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.2),
                   fontSize: 12,
@@ -240,7 +246,12 @@ class _HomePageState extends State<HomePage> {
         selected: isSelected,
         selectedTileColor: _accent.withOpacity(0.08),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        onTap: () => _navigateToPage(pageIndex),
+        onTap: () {
+          _navigateToPage(pageIndex);
+          Navigator.pop(
+            context,
+          ); // ⚡ FIXED: Only pop the drawer when a drawer item is tapped!
+        },
       ),
     );
   }

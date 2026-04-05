@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'pdf_preview_page.dart'; // NEW IMPORT
 
 class DoctorsPage extends StatefulWidget {
   const DoctorsPage({super.key});
@@ -338,6 +340,7 @@ class _BookingSheetState extends State<_BookingSheet> {
                 final date = DateTime.now().add(Duration(days: i + 1));
                 final isSelected = _selectedDate.day == date.day;
                 final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
                 return GestureDetector(
                   onTap: () => setState(() => _selectedDate = date),
                   child: AnimatedContainer(
@@ -429,22 +432,31 @@ class _BookingSheetState extends State<_BookingSheet> {
           ),
           const SizedBox(height: 24),
 
-          // Confirm button
+          // ⚡ NEW: Generate PDF and Show Preview
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: _selectedSlot >= 0
-                  ? () {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Appointment booked with ${widget.doctorName} on '
-                            '${_selectedDate.day}/${_selectedDate.month} at ${_timeSlots[_selectedSlot]}',
-                          ),
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                  ? () async {
+                      // Fetch the locally saved user name
+                      const storage = FlutterSecureStorage();
+                      final pName =
+                          await storage.read(key: 'username') ?? 'Patient';
+
+                      if (!mounted) return;
+                      Navigator.pop(context); // Close the bottom sheet
+
+                      final dateStr =
+                          '${_selectedDate.day}/${_selectedDate.month} at ${_timeSlots[_selectedSlot]}';
+
+                      // Push the PDF Preview page
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PdfPreviewPage(
+                            doctorName: widget.doctorName,
+                            patientName: pName,
+                            appointmentDetails: dateStr,
                           ),
                         ),
                       );
@@ -462,7 +474,7 @@ class _BookingSheetState extends State<_BookingSheet> {
                 elevation: 0,
               ),
               child: const Text(
-                'Confirm Appointment',
+                'Generate Report & Book',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),

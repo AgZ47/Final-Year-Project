@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/wellness_engine.dart';
+import '../../services/health_database_service.dart';
 import '../../widgets/wellness_widgets.dart';
 
 class GoalsPage extends StatefulWidget {
@@ -13,24 +14,86 @@ class _GoalsPageState extends State<GoalsPage> {
   static const _accent = Color(0xFF4DD0E1);
   static const _green = Color(0xFF66BB6A);
 
-  late List<SmartGoal> _goals;
+  List<Map<String, dynamic>> _goals = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _goals = WellnessEngine.generateGoals(WellnessEngine.currentMetrics);
+    _loadGoals();
   }
 
-  int get _acceptedCount => _goals.where((g) => g.accepted).length;
+  Future<void> _loadGoals() async {
+    final dbGoals = await HealthDatabaseService.instance.getGoals();
+
+    // If empty, generate AI goals and save to DB
+    if (dbGoals.isEmpty) {
+      final initialGoals = WellnessEngine.generateGoals(
+        WellnessEngine.currentMetrics,
+      );
+      for (var goal in initialGoals) {
+        await HealthDatabaseService.instance.insertRecord('goals', {
+          'title': goal.title,
+          'description': goal.description,
+          'progress': goal.progress,
+          'category': goal.category,
+          'is_accepted': goal.accepted ? 1 : 0,
+        });
+      }
+      // Re-fetch to get IDs
+      final newGoals = await HealthDatabaseService.instance.getGoals();
+      setState(() {
+        _goals = newGoals.map((e) => Map<String, dynamic>.from(e)).toList();
+        _isLoading = false;
+      });
+    } else {
+      setState(() {
+        _goals = dbGoals.map((e) => Map<String, dynamic>.from(e)).toList();
+        _isLoading = false;
+      });
+    }
+  }
+
+  int get _acceptedCount => _goals.where((g) => g['is_accepted'] == 1).length;
+
   double get _avgProgress {
-    final accepted = _goals.where((g) => g.accepted).toList();
+    final accepted = _goals.where((g) => g['is_accepted'] == 1).toList();
     if (accepted.isEmpty) return 0;
-    return accepted.map((g) => g.progress).reduce((a, b) => a + b) /
+    return accepted
+            .map((g) => (g['progress'] as num).toDouble())
+            .reduce((a, b) => a + b) /
         accepted.length;
+  }
+
+  Future<void> _acceptGoal(int index) async {
+    final id = _goals[index]['id'] as int;
+    await HealthDatabaseService.instance.acceptGoal(id);
+    setState(() {
+      _goals[index]['is_accepted'] = 1;
+    });
+  }
+
+  Future<void> _skipGoal(int index) async {
+    final id = _goals[index]['id'] as int;
+    await HealthDatabaseService.instance.deleteRecord('goals', id);
+    setState(() {
+      _goals.removeAt(index);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: _accent));
+    }
+
+    final acceptedGoals = _goals.asMap().entries.where(
+      (e) => e.value['is_accepted'] == 1,
+    );
+    final suggestedGoals = _goals.asMap().entries.where(
+      (e) => e.value['is_accepted'] == 0,
+    );
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -63,31 +126,41 @@ class _GoalsPageState extends State<GoalsPage> {
               ),
               const SizedBox(height: 24),
 
-              // ── Overall Progress ──
               _buildOverallProgress(),
               const SizedBox(height: 24),
 
-              // ── Active Goals ──
               _sectionTitle('Active Goals'),
               const SizedBox(height: 12),
-              ..._goals
-                  .where((g) => g.accepted)
-                  .map((g) => GoalProgressCard(goal: g)),
+              ...acceptedGoals.map(
+                (entry) => GoalProgressCard(
+                  goal: SmartGoal(
+                    title: entry.value['title'],
+                    description: entry.value['description'],
+                    progress: (entry.value['progress'] as num).toDouble(),
+                    category: entry.value['category'],
+                    accepted: true,
+                  ),
+                ),
+              ),
 
-              // ── Suggested Goals ──
-              if (_goals.any((g) => !g.accepted)) ...[
+              if (suggestedGoals.isNotEmpty) ...[
                 const SizedBox(height: 24),
                 _sectionTitle('Suggested for You'),
                 const SizedBox(height: 12),
-                ..._goals.where((g) => !g.accepted).map((g) {
-                  return GoalProgressCard(
-                    goal: g,
-                    onAccept: () => setState(() => g.accepted = true),
-                    onSkip: () => setState(() => _goals.remove(g)),
-                  );
-                }),
+                ...suggestedGoals.map(
+                  (entry) => GoalProgressCard(
+                    goal: SmartGoal(
+                      title: entry.value['title'],
+                      description: entry.value['description'],
+                      progress: (entry.value['progress'] as num).toDouble(),
+                      category: entry.value['category'],
+                      accepted: false,
+                    ),
+                    onAccept: () => _acceptGoal(entry.key),
+                    onSkip: () => _skipGoal(entry.key),
+                  ),
+                ),
               ],
-
               const SizedBox(height: 32),
             ],
           ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../home/breathing_exercise.dart';
+import '../../services/health_database_service.dart';
 
 class Mental extends StatefulWidget {
   const Mental({super.key});
@@ -12,6 +13,10 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
   // ── State ──
   int _selectedMood = -1;
   double _stressLevel = 0.3;
+  bool _isSaving = false;
+
+  // ── Dynamic Chart Data ──
+  List<double> _weeklyMoodData = List.filled(7, 0.0);
 
   // ── Mood data ──
   static const _moods = [
@@ -22,8 +27,6 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
     {'emoji': '😢', 'label': 'Sad'},
   ];
 
-  // ── Weekly mood data (0.0–1.0 scale) ──
-  static const _weeklyMood = [0.8, 0.6, 0.9, 0.5, 0.7, 0.85, 0.65];
   static const _dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   // ── Colors ──
@@ -48,12 +51,62 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
       curve: Curves.easeOut,
     );
     _fadeController.forward();
+
+    _loadWeeklyMoodData(); // ⚡ NEW: Fetch data on load
   }
 
   @override
   void dispose() {
     _fadeController.dispose();
     super.dispose();
+  }
+
+  // ==========================================
+  // 📊 FETCH MOOD DATA FROM SQLITE
+  // ==========================================
+  Future<void> _loadWeeklyMoodData() async {
+    final logs = await HealthDatabaseService.instance.getRecords(
+      'mental_health_logs',
+    );
+    final now = DateTime.now();
+
+    List<double> tempMood = List.filled(7, 0.0);
+    List<int> moodCounts = List.filled(7, 0);
+
+    for (var log in logs) {
+      final logDate = DateTime.parse(log['timestamp'] as String);
+      final difference = now.difference(logDate).inDays;
+
+      if (difference < 7) {
+        // Only look at the last 7 days
+        int dayIndex = logDate.weekday - 1; // 0=Mon, 6=Sun
+
+        // Convert UI mood index (0=Happy, 4=Sad) to a 1.0 (Good) to 0.0 (Bad) scale
+        int rawMood = log['mood_score'] as int;
+        double score = 1.0 - (rawMood / 4.0);
+
+        tempMood[dayIndex] += score;
+        moodCounts[dayIndex]++;
+      }
+    }
+
+    // Average out the scores for days with multiple logs
+    for (int i = 0; i < 7; i++) {
+      if (moodCounts[i] > 0) {
+        tempMood[i] = tempMood[i] / moodCounts[i];
+      }
+    }
+
+    // Add a baseline if there is absolutely no data so the UI doesn't look broken
+    if (tempMood.every((e) => e == 0.0)) {
+      tempMood = [0.6, 0.8, 0.5, 0.9, 0.7, 0.85, 0.6];
+    }
+
+    if (mounted) {
+      setState(() {
+        _weeklyMoodData = tempMood;
+      });
+    }
   }
 
   String get _stressLabel {
@@ -66,6 +119,45 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
     if (_stressLevel < 0.33) return const Color(0xFF66BB6A);
     if (_stressLevel < 0.66) return const Color(0xFFFFB74D);
     return const Color(0xFFEF5350);
+  }
+
+  // ==========================================
+  // 💾 SAVE LOG TO DATABASE
+  // ==========================================
+  Future<void> _saveMentalLog() async {
+    if (_selectedMood == -1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a mood first!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    int stressInt = (_stressLevel * 100).round();
+
+    await HealthDatabaseService.instance.logMood(_selectedMood, stressInt);
+
+    if (!mounted) return;
+
+    setState(() {
+      _isSaving = false;
+      _selectedMood = -1; // Reset after saving
+      _stressLevel = 0.3;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Mental health log saved successfully!'),
+        backgroundColor: _stressColor,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+
+    // ⚡ NEW: Refresh the chart instantly after saving
+    _loadWeeklyMoodData();
   }
 
   @override
@@ -115,6 +207,39 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
                 _buildSectionTitle('Stress Level'),
                 const SizedBox(height: 14),
                 _buildStressSlider(),
+                const SizedBox(height: 28),
+
+                // ── Save Button ──
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isSaving ? null : _saveMentalLog,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _purple,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: _isSaving
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            'Save Daily Log',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                  ),
+                ),
                 const SizedBox(height: 28),
 
                 // ── Guided Breathing ──
@@ -352,7 +477,7 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: List.generate(7, (i) {
-          final h = _weeklyMood[i];
+          final h = _weeklyMoodData[i]; // ⚡ UPDATED: Uses dynamic data
           final isToday = i == DateTime.now().weekday - 1;
           final barColor = isToday ? _accent : _indigo;
           return Column(
@@ -433,8 +558,7 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Your stress levels decreased by 18% this week. '
-                  'Continue mindfulness exercises for best results.',
+                  'Your stress levels decreased by 18% this week. Continue mindfulness exercises for best results.',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.7),
                     fontSize: 14,

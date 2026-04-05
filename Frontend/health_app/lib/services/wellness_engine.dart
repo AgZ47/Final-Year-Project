@@ -1,7 +1,6 @@
-/// Synergy AI – Wellness Engine
-/// Central logic for scoring, risk detection, recovery, and recommendations.
-/// All calculations use rule-based logic with sample data for demo mode.
+import 'health_database_service.dart';
 
+// ─── Data Models ───
 class WellnessMetrics {
   final double sleepQuality; // 0.0–1.0
   final double moodScore; // 0.0–1.0
@@ -116,7 +115,7 @@ class WellnessEngine {
   static const _heartWeight = 0.15;
   static const _activityWeight = 0.10;
 
-  /// Current demo metrics
+  // Static Fallbacks (kept temporarily so Insights/Reports don't break during transition)
   static const currentMetrics = WellnessMetrics(
     sleepQuality: 0.82,
     moodScore: 0.75,
@@ -124,8 +123,6 @@ class WellnessEngine {
     heartRateStability: 0.85,
     activityLevel: 0.60,
   );
-
-  /// Previous week metrics for comparison
   static const previousMetrics = WellnessMetrics(
     sleepQuality: 0.70,
     moodScore: 0.65,
@@ -134,8 +131,61 @@ class WellnessEngine {
     activityLevel: 0.50,
   );
 
-  // ── Wellness Score ──
+  // ==========================================
+  // 🚀 NEW: DYNAMIC DATA FETCHING
+  // ==========================================
+  static Future<WellnessMetrics> getDynamicMetrics() async {
+    final db = HealthDatabaseService.instance;
 
+    // 1. Fetch Today's Steps
+    final now = DateTime.now();
+    final todayStr = now.toIso8601String().substring(0, 10);
+    final stepLogs = await db.getRecords('step_logs');
+
+    int totalSteps = 0;
+    for (var log in stepLogs) {
+      if (log['timestamp'].toString().startsWith(todayStr)) {
+        totalSteps += (log['steps'] as int);
+      }
+    }
+    // Assume 8,000 steps is a 100% (1.0) activity level for the day
+    double activityLevel = (totalSteps / 8000.0).clamp(0.0, 1.0);
+
+    // 2. Fetch Latest Mental Health Log
+    final moodLogs = await db.getRecords(
+      'mental_health_logs',
+      orderBy: 'id DESC',
+      limit: 1,
+    );
+    double moodScore = 0.75; // Default Baseline
+    double stressLevel = 0.30; // Default Baseline
+
+    if (moodLogs.isNotEmpty) {
+      final latest = moodLogs.first;
+
+      // Convert UI mood index (0=Happy, 4=Sad) to an engine score (1.0=Good, 0.0=Bad)
+      int rawMood = latest['mood_score'] as int;
+      moodScore = 1.0 - (rawMood / 4.0);
+
+      // Convert UI stress (saved as 0-100) back to 0.0-1.0
+      int rawStress = latest['stress_level'] as int;
+      stressLevel = (rawStress / 100.0).clamp(0.0, 1.0);
+    }
+
+    // Return real metrics!
+    return WellnessMetrics(
+      sleepQuality: 0.82, // Hardcoded baseline until sleep logs are wired
+      moodScore: moodScore,
+      stressLevel: stressLevel,
+      heartRateStability:
+          0.85, // We pull HR dynamically in the UI directly from watch
+      activityLevel: activityLevel > 0
+          ? activityLevel
+          : 0.4, // Keep a base so UI isn't dead on fresh install
+    );
+  }
+
+  // ── Wellness Score ──
   static int calculateWellnessScore(WellnessMetrics m) {
     final raw =
         (m.sleepQuality * _sleepWeight) +
@@ -154,8 +204,7 @@ class WellnessEngine {
     return 'Stable';
   }
 
-  // ── Recovery Score (WHOOP-inspired) ──
-
+  // ── Recovery Score ──
   static int calculateRecoveryScore(WellnessMetrics m) {
     final raw =
         (m.sleepQuality * 0.45) +
@@ -170,18 +219,10 @@ class WellnessEngine {
     return 'Rest Recommended';
   }
 
-  static String getRecoveryColor(int score) {
-    if (score >= 75) return 'green';
-    if (score >= 50) return 'yellow';
-    return 'red';
-  }
-
   // ── Health Risk Detection ──
-
   static List<HealthAlert> detectHealthRisks(WellnessMetrics m) {
     final alerts = <HealthAlert>[];
-
-    if (m.sleepQuality < 0.5) {
+    if (m.sleepQuality < 0.5)
       alerts.add(
         const HealthAlert(
           title: 'Poor Sleep Pattern',
@@ -191,9 +232,7 @@ class WellnessEngine {
           icon: '😴',
         ),
       );
-    }
-
-    if (m.stressLevel > 0.7) {
+    if (m.stressLevel > 0.7)
       alerts.add(
         const HealthAlert(
           title: 'High Stress Levels',
@@ -203,9 +242,7 @@ class WellnessEngine {
           icon: '😰',
         ),
       );
-    }
-
-    if (m.heartRateStability < 0.6) {
+    if (m.heartRateStability < 0.6)
       alerts.add(
         const HealthAlert(
           title: 'Elevated Heart Rate',
@@ -215,9 +252,7 @@ class WellnessEngine {
           icon: '❤️',
         ),
       );
-    }
-
-    if (m.activityLevel < 0.3) {
+    if (m.activityLevel < 0.3)
       alerts.add(
         const HealthAlert(
           title: 'Low Activity',
@@ -227,9 +262,7 @@ class WellnessEngine {
           icon: '🚶',
         ),
       );
-    }
-
-    if (m.moodScore < 0.4) {
+    if (m.moodScore < 0.4)
       alerts.add(
         const HealthAlert(
           title: 'Mood Decline',
@@ -239,19 +272,15 @@ class WellnessEngine {
           icon: '😔',
         ),
       );
-    }
-
     return alerts;
   }
 
   // ── Recommendations ──
-
   static List<WellnessRecommendation> generateRecommendations(
     WellnessMetrics m,
   ) {
     final recs = <WellnessRecommendation>[];
-
-    if (m.activityLevel < 0.5) {
+    if (m.activityLevel < 0.5)
       recs.add(
         const WellnessRecommendation(
           title: 'Take a short walk',
@@ -261,9 +290,7 @@ class WellnessEngine {
           iconName: 'directions_walk',
         ),
       );
-    }
-
-    if (m.stressLevel > 0.4) {
+    if (m.stressLevel > 0.4)
       recs.add(
         const WellnessRecommendation(
           title: 'Try breathing exercises',
@@ -273,9 +300,7 @@ class WellnessEngine {
           iconName: 'air',
         ),
       );
-    }
-
-    if (m.sleepQuality < 0.8) {
+    if (m.sleepQuality < 0.8)
       recs.add(
         const WellnessRecommendation(
           title: 'Sleep earlier tonight',
@@ -285,9 +310,7 @@ class WellnessEngine {
           iconName: 'bedtime',
         ),
       );
-    }
-
-    if (m.moodScore < 0.7) {
+    if (m.moodScore < 0.7)
       recs.add(
         const WellnessRecommendation(
           title: 'Practice gratitude',
@@ -297,8 +320,6 @@ class WellnessEngine {
           iconName: 'favorite',
         ),
       );
-    }
-
     recs.add(
       const WellnessRecommendation(
         title: 'Stay hydrated',
@@ -308,12 +329,10 @@ class WellnessEngine {
         iconName: 'water_drop',
       ),
     );
-
     return recs;
   }
 
   // ── Weekly Improvements ──
-
   static List<WeeklyImprovement> getWeeklyImprovements() {
     return const [
       WeeklyImprovement(metric: 'Sleep Quality', percentage: 12.0, unit: '%'),
@@ -325,7 +344,6 @@ class WellnessEngine {
   }
 
   // ── Smart Goals ──
-
   static List<SmartGoal> generateGoals(WellnessMetrics m) {
     return [
       SmartGoal(
@@ -368,7 +386,6 @@ class WellnessEngine {
   }
 
   // ── Timeline ──
-
   static List<TimelineEntry> getTodayTimeline() {
     return const [
       TimelineEntry(
@@ -424,7 +441,6 @@ class WellnessEngine {
   }
 
   // ── Insights ──
-
   static List<InsightItem> getInsights() {
     return const [
       InsightItem(
@@ -466,23 +482,16 @@ class WellnessEngine {
   }
 
   // ── Smart Notifications ──
-
   static List<String> getSmartNotifications(WellnessMetrics m) {
     final notifications = <String>[];
-
-    if (m.stressLevel > 0.4) {
+    if (m.stressLevel > 0.4)
       notifications.add('🧘 Time for your breathing exercise');
-    }
-    if (m.moodScore < 0.7) {
+    if (m.moodScore < 0.7)
       notifications.add('📝 You haven\'t logged your mood today');
-    }
-    if (m.sleepQuality < 0.75) {
+    if (m.sleepQuality < 0.75)
       notifications.add('🌙 Try going to bed earlier tonight');
-    }
-    if (m.activityLevel < 0.5) {
+    if (m.activityLevel < 0.5)
       notifications.add('🚶 A short walk could boost your energy');
-    }
-
     return notifications;
   }
 }

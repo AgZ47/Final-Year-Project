@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/health_database_service.dart';
 import '../../widgets/wellness_widgets.dart';
 
 class HabitsPage extends StatefulWidget {
@@ -18,33 +19,11 @@ class _HabitsPageState extends State<HabitsPage>
   late AnimationController _ringController;
   late Animation<double> _ringAnim;
 
-  // ── Habit state ──
-  final List<Map<String, dynamic>> _habits = [
-    {
-      'title': 'Drink 8 glasses of water',
-      'emoji': '💧',
-      'done': true,
-      'streak': 7,
-    },
-    {
-      'title': 'Complete breathing exercise',
-      'emoji': '🧘',
-      'done': true,
-      'streak': 5,
-    },
-    {'title': 'Walk 5,000 steps', 'emoji': '🚶', 'done': false, 'streak': 3},
-    {'title': 'Sleep 7+ hours', 'emoji': '😴', 'done': true, 'streak': 4},
-    {'title': 'Meditate 5 minutes', 'emoji': '🧠', 'done': false, 'streak': 2},
-    {'title': 'Eat a healthy meal', 'emoji': '🥗', 'done': false, 'streak': 0},
-    {
-      'title': 'Stretch for 10 minutes',
-      'emoji': '🤸',
-      'done': false,
-      'streak': 1,
-    },
-  ];
+  // ── Database state ──
+  List<Map<String, dynamic>> _habits = [];
+  bool _isLoading = true;
 
-  int get _completedCount => _habits.where((h) => h['done'] as bool).length;
+  int get _completedCount => _habits.where((h) => h['is_done'] == 1).length;
   double get _completionPct =>
       _habits.isEmpty ? 0 : _completedCount / _habits.length;
 
@@ -59,7 +38,34 @@ class _HabitsPageState extends State<HabitsPage>
       parent: _ringController,
       curve: Curves.easeOutCubic,
     );
+
+    // Load habits from SQLite
+    _loadHabits();
+  }
+
+  Future<void> _loadHabits() async {
+    final data = await HealthDatabaseService.instance.getHabits();
+    setState(() {
+      // Convert to a modifiable list of maps so we can update state locally
+      _habits = data.map((e) => Map<String, dynamic>.from(e)).toList();
+      _isLoading = false;
+    });
     _ringController.forward();
+  }
+
+  Future<void> _toggleHabit(int index, bool isDone) async {
+    final habit = _habits[index];
+    final id = habit['id'] as int;
+
+    // Update Database
+    await HealthDatabaseService.instance.toggleHabitStatus(id, isDone);
+
+    // Update UI State
+    setState(() {
+      _habits[index]['is_done'] = isDone ? 1 : 0;
+      _ringController.reset();
+      _ringController.forward();
+    });
   }
 
   @override
@@ -70,6 +76,10 @@ class _HabitsPageState extends State<HabitsPage>
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: _accent));
+    }
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -102,31 +112,22 @@ class _HabitsPageState extends State<HabitsPage>
               ),
               const SizedBox(height: 24),
 
-              // ── Completion Ring ──
               _buildCompletionCard(),
               const SizedBox(height: 24),
-
-              // ── Streak Highlights ──
               _buildStreakHighlights(),
               const SizedBox(height: 24),
 
-              // ── Habit List ──
               _sectionTitle('Today\'s Goals'),
               const SizedBox(height: 12),
+
               ...List.generate(_habits.length, (i) {
                 final h = _habits[i];
                 return HabitTrackerCard(
                   title: h['title'] as String,
                   emoji: h['emoji'] as String,
-                  completed: h['done'] as bool,
+                  completed: h['is_done'] == 1,
                   streak: h['streak'] as int,
-                  onToggle: (v) {
-                    setState(() {
-                      _habits[i]['done'] = v;
-                      _ringController.reset();
-                      _ringController.forward();
-                    });
-                  },
+                  onToggle: (v) => _toggleHabit(i, v),
                 );
               }),
               const SizedBox(height: 32),

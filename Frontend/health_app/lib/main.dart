@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:health_app/animations/introduction_animation_screen.dart';
 import 'package:health_app/home_page.dart';
+import 'package:health_app/login_page.dart'; // <-- Replaced animation import with this
 import 'services/health_database_service.dart';
 
 void main() {
@@ -17,17 +17,17 @@ class MyApp extends StatelessWidget {
     const storage = FlutterSecureStorage();
 
     try {
-      //Initializing the encrypted database
+      // Initializing the encrypted database
       // This retrieves/generates the key and opens the DB
       await HealthDatabaseService.instance.database;
 
-      //Checking login status
+      // Checking login status
       String? token = await storage.read(key: 'user_session_token');
       String? username = await storage.read(key: 'username');
 
       return {'token': token, 'username': username};
     } catch (e) {
-      //DB exception handling
+      // DB exception handling
       debugPrint("App Init Error: $e");
       return {'token': null, 'username': null};
     }
@@ -39,19 +39,17 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        // ── Core palette (matching sleep screen) ──
         scaffoldBackgroundColor: const Color(0xFF0D1B2A),
-        primaryColor: const Color(0xFF4DD0E1),          // Teal accent
+        primaryColor: const Color(0xFF4DD0E1),
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF4DD0E1),                    // Teal accent
-          secondary: Color(0xFF7E57C2),                  // Purple
-          tertiary: Color(0xFF5C6BC0),                   // Indigo
-          surface: Color(0xFF152238),                    // Navy card surface
+          primary: Color(0xFF4DD0E1),
+          secondary: Color(0xFF7E57C2),
+          tertiary: Color(0xFF5C6BC0),
+          surface: Color(0xFF152238),
           onPrimary: Color(0xFF0D1B2A),
           onSecondary: Colors.white,
           onSurface: Colors.white,
         ),
-        // ── Navigation bar ──
         navigationBarTheme: NavigationBarThemeData(
           backgroundColor: const Color(0xFF0D1B2A),
           indicatorColor: const Color(0xFF4DD0E1).withOpacity(0.15),
@@ -72,25 +70,23 @@ class MyApp extends StatelessWidget {
             return const TextStyle(color: Colors.white38, fontSize: 12);
           }),
         ),
-        // ── Text ──
         textTheme: const TextTheme(
           displayLarge: TextStyle(color: Colors.white),
           bodyLarge: TextStyle(color: Colors.white70),
           titleLarge: TextStyle(color: Colors.white),
         ),
-        // ── Cards ──
         cardTheme: CardThemeData(
           color: const Color(0xFF152238),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           elevation: 0,
         ),
-        // ── AppBar ──
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.transparent,
           elevation: 0,
           foregroundColor: Colors.white,
         ),
-        // ── Inputs ──
         inputDecorationTheme: const InputDecorationTheme(
           labelStyle: TextStyle(color: Colors.white54),
           prefixIconColor: Colors.white38,
@@ -107,7 +103,9 @@ class MyApp extends StatelessWidget {
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
+              body: Center(
+                child: CircularProgressIndicator(color: Color(0xFF4DD0E1)),
+              ),
             );
           }
 
@@ -118,7 +116,8 @@ class MyApp extends StatelessWidget {
             );
           }
 
-          return const IntroductionAnimationScreen();
+          // If no token, jump straight to Biometric Login/Setup
+          return const LoginPage();
         },
       ),
     );

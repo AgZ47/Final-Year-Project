@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import '../../services/watch_service.dart';
+import '../../services/health_database_service.dart';
 
 class Physical extends StatefulWidget {
   const Physical({super.key});
@@ -17,36 +19,11 @@ class _PhysicalState extends State<Physical>
   static const _green = Color(0xFF66BB6A);
   static const _orange = Color(0xFFFFB74D);
 
-  // ── Sample heart rate data (24 points for the line graph) ──
-  static const _heartRateData = [
-    68,
-    70,
-    72,
-    71,
-    69,
-    73,
-    78,
-    82,
-    85,
-    80,
-    76,
-    74,
-    72,
-    70,
-    71,
-    75,
-    79,
-    77,
-    73,
-    71,
-    70,
-    69,
-    72,
-    72,
-  ];
+  // ── Dynamic Data State ──
+  List<double> _weeklySteps = List.filled(7, 0);
+  int _todaySteps = 0;
+  bool _isLoading = true;
 
-  // ── Weekly activity data ──
-  static const _weeklySteps = [3200, 5400, 4320, 6100, 3800, 7200, 4800];
   static const _dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   late AnimationController _animController;
@@ -55,22 +32,115 @@ class _PhysicalState extends State<Physical>
   @override
   void initState() {
     super.initState();
+    WatchService().initialize();
+
+    // ⚡ NEW: Listen to background syncs from the smartwatch!
+    WatchService().syncTrigger.addListener(_loadPhysicalData);
+
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
     _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _animController.forward();
+
+    _loadPhysicalData();
   }
 
   @override
   void dispose() {
+    // ⚡ Don't forget to remove the listener!
+    WatchService().syncTrigger.removeListener(_loadPhysicalData);
     _animController.dispose();
     super.dispose();
   }
 
+  // ==========================================
+  // 📊 FETCH DATA FROM DATABASE
+  // ==========================================
+  Future<void> _loadPhysicalData() async {
+    final logs = await HealthDatabaseService.instance.getRecords('step_logs');
+    final now = DateTime.now();
+
+    List<double> tempWeeklySteps = List.filled(7, 0);
+    int tempTodaySteps = 0;
+
+    for (var log in logs) {
+      final logDate = DateTime.parse(log['timestamp'] as String);
+      final steps = log['steps'] as int;
+
+      // Check if log is from today
+      if (logDate.year == now.year &&
+          logDate.month == now.month &&
+          logDate.day == now.day) {
+        tempTodaySteps += steps;
+      }
+
+      // Populate weekly chart (simple check for logs within the last 7 days)
+      final difference = now.difference(logDate).inDays;
+      if (difference < 7) {
+        // weekday is 1-7 (Mon-Sun). Subtract 1 for 0-6 index.
+        int dayIndex = logDate.weekday - 1;
+        tempWeeklySteps[dayIndex] += steps.toDouble();
+      }
+    }
+
+    // Prevent completely empty graphs on fresh install by adding a baseline if empty
+    if (tempWeeklySteps.every((element) => element == 0)) {
+      tempWeeklySteps = [3200, 5400, 4320, 6100, 3800, 7200, 4800];
+    }
+
+    if (mounted) {
+      setState(() {
+        _weeklySteps = tempWeeklySteps;
+        _todaySteps = tempTodaySteps > 0
+            ? tempTodaySteps
+            : 4320; // Fallback for UI if 0
+        _isLoading = false;
+      });
+    }
+  }
+
+  // ==========================================
+  // 🏃 LOG QUICK WORKOUT
+  // ==========================================
+  Future<void> _logQuickWalk() async {
+    // Simulates a quick 1,000 step walk
+    await HealthDatabaseService.instance.logSteps(1000, 800.0, 45.0);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Added 1,000 steps to today\'s log!'),
+        backgroundColor: _accent,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+
+    _loadPhysicalData();
+  }
+
+  String _getHeartRateStatus(int bpm) {
+    if (bpm < 60) return 'Resting';
+    if (bpm <= 85) return 'Active';
+    if (bpm <= 120) return 'Exercising';
+    return 'Stressed';
+  }
+
+  Color _getStatusColor(int bpm) {
+    if (bpm <= 85) return _green;
+    if (bpm <= 120) return _orange;
+    return Colors.redAccent;
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Container(
+        color: const Color(0xFF0D1B2A),
+        child: const Center(child: CircularProgressIndicator(color: _accent)),
+      );
+    }
+
     return FadeTransition(
       opacity: _fadeAnim,
       child: Container(
@@ -87,44 +157,58 @@ class _PhysicalState extends State<Physical>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Header ──
-                const Text(
-                  'Physical Health',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Monitor your activity & vitals',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.5),
-                    fontSize: 15,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Physical Health',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Monitor your activity & vitals',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.5),
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      onPressed: _logQuickWalk,
+                      icon: const Icon(
+                        Icons.add_circle,
+                        color: _accent,
+                        size: 32,
+                      ),
+                      tooltip: 'Log 1,000 Steps',
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 24),
 
-                // ── Activity Summary ──
                 _buildSectionTitle('Activity Summary'),
                 const SizedBox(height: 14),
                 _buildActivityCards(),
                 const SizedBox(height: 28),
 
-                // ── Heart Rate Monitor ──
                 _buildSectionTitle('Heart Rate'),
                 const SizedBox(height: 14),
                 _buildHeartRateCard(),
                 const SizedBox(height: 28),
 
-                // ── Workout Suggestions ──
                 _buildSectionTitle('Workout Suggestions'),
                 const SizedBox(height: 14),
                 _buildWorkoutSuggestions(),
                 const SizedBox(height: 28),
 
-                // ── Weekly Activity ──
                 _buildSectionTitle('Weekly Activity'),
                 const SizedBox(height: 14),
                 _buildWeeklyGraph(),
@@ -137,8 +221,6 @@ class _PhysicalState extends State<Physical>
     );
   }
 
-  // ─── Activity Summary Cards ───────────────────────────────────────────────
-
   Widget _buildActivityCards() {
     return Row(
       children: [
@@ -146,7 +228,7 @@ class _PhysicalState extends State<Physical>
           child: _metricCard(
             Icons.directions_walk_rounded,
             'Steps',
-            '4,320',
+            '$_todaySteps',
             _accent,
           ),
         ),
@@ -155,13 +237,18 @@ class _PhysicalState extends State<Physical>
           child: _metricCard(
             Icons.local_fire_department_rounded,
             'Calories',
-            '210 kcal',
+            '${(_todaySteps * 0.04).round()} kcal',
             _orange,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: _metricCard(Icons.timer_rounded, 'Active', '32 min', _green),
+          child: _metricCard(
+            Icons.timer_rounded,
+            'Active',
+            '${(_todaySteps / 100).round()} min',
+            _green,
+          ),
         ),
       ],
     );
@@ -208,129 +295,134 @@ class _PhysicalState extends State<Physical>
     );
   }
 
-  // ─── Heart Rate Card ──────────────────────────────────────────────────────
-
   Widget _buildHeartRateCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: _bgCard,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Column(
-        children: [
-          Row(
+    return ValueListenableBuilder<List<int>>(
+      valueListenable: WatchService().heartRateHistory,
+      builder: (context, heartRateData, child) {
+        final currentBpm = heartRateData.isNotEmpty ? heartRateData.last : 0;
+        final statusText = _getHeartRateStatus(currentBpm);
+        final statusColor = _getStatusColor(currentBpm);
+
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: _bgCard,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white10),
+          ),
+          child: Column(
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.favorite_rounded,
-                  color: Colors.redAccent,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Row(
                 children: [
-                  const Text(
-                    '72 bpm',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.favorite_rounded,
+                      color: Colors.redAccent,
+                      size: 24,
                     ),
                   ),
-                  Text(
-                    'Resting Heart Rate',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.5),
-                      fontSize: 13,
+                  const SizedBox(width: 14),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$currentBpm bpm',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Current Heart Rate',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.5),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      statusText,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 ],
               ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
+              const SizedBox(height: 20),
+              SizedBox(
+                height: 100,
+                child: CustomPaint(
+                  size: const Size(double.infinity, 100),
+                  painter: _HeartRateGraphPainter(data: heartRateData),
                 ),
-                decoration: BoxDecoration(
-                  color: _green.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Text(
-                  'Normal',
-                  style: TextStyle(
-                    color: _green,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '12 AM',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.3),
+                      fontSize: 11,
+                    ),
                   ),
-                ),
+                  Text(
+                    '6 AM',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.3),
+                      fontSize: 11,
+                    ),
+                  ),
+                  Text(
+                    '12 PM',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.3),
+                      fontSize: 11,
+                    ),
+                  ),
+                  Text(
+                    '6 PM',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.3),
+                      fontSize: 11,
+                    ),
+                  ),
+                  Text(
+                    'Now',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.3),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          SizedBox(
-            height: 100,
-            child: CustomPaint(
-              size: const Size(double.infinity, 100),
-              painter: _HeartRateGraphPainter(data: _heartRateData),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '12 AM',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.3),
-                  fontSize: 11,
-                ),
-              ),
-              Text(
-                '6 AM',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.3),
-                  fontSize: 11,
-                ),
-              ),
-              Text(
-                '12 PM',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.3),
-                  fontSize: 11,
-                ),
-              ),
-              Text(
-                '6 PM',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.3),
-                  fontSize: 11,
-                ),
-              ),
-              Text(
-                'Now',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.3),
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
-
-  // ─── Workout Suggestions ──────────────────────────────────────────────────
 
   Widget _buildWorkoutSuggestions() {
     final workouts = [
@@ -406,10 +498,10 @@ class _PhysicalState extends State<Physical>
     );
   }
 
-  // ─── Weekly Activity Graph ────────────────────────────────────────────────
-
   Widget _buildWeeklyGraph() {
-    final maxSteps = _weeklySteps.reduce(math.max).toDouble();
+    final maxSteps = _weeklySteps.reduce(math.max);
+    final safeMax = maxSteps == 0 ? 10000.0 : maxSteps;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -425,7 +517,7 @@ class _PhysicalState extends State<Physical>
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: List.generate(7, (i) {
-                final pct = _weeklySteps[i] / maxSteps;
+                final pct = _weeklySteps[i] / safeMax;
                 final isToday = i == DateTime.now().weekday - 1;
                 return Column(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -489,8 +581,6 @@ class _PhysicalState extends State<Physical>
     );
   }
 
-  // ─── Helpers ──────────────────────────────────────────────────────────────
-
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
@@ -503,34 +593,27 @@ class _PhysicalState extends State<Physical>
   }
 }
 
-// ─── Heart Rate Line Graph Painter ──────────────────────────────────────────
-
 class _HeartRateGraphPainter extends CustomPainter {
   final List<int> data;
-
   _HeartRateGraphPainter({required this.data});
 
   @override
   void paint(Canvas canvas, Size size) {
     if (data.isEmpty) return;
-
     final minVal = data.reduce(math.min).toDouble() - 5;
     final maxVal = data.reduce(math.max).toDouble() + 5;
-    final range = maxVal - minVal;
-
+    final range = maxVal == minVal ? 1.0 : maxVal - minVal;
     final path = Path();
     final fillPath = Path();
 
     for (int i = 0; i < data.length; i++) {
       final x = (i / (data.length - 1)) * size.width;
       final y = size.height - ((data[i] - minVal) / range) * size.height;
-
       if (i == 0) {
         path.moveTo(x, y);
         fillPath.moveTo(x, size.height);
         fillPath.lineTo(x, y);
       } else {
-        // Smooth curve
         final prevX = ((i - 1) / (data.length - 1)) * size.width;
         final prevY =
             size.height - ((data[i - 1] - minVal) / range) * size.height;
@@ -539,11 +622,9 @@ class _HeartRateGraphPainter extends CustomPainter {
         fillPath.cubicTo(midX, prevY, midX, y, x, y);
       }
     }
-
     fillPath.lineTo(size.width, size.height);
     fillPath.close();
 
-    // Fill gradient
     final fillPaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
@@ -554,8 +635,6 @@ class _HeartRateGraphPainter extends CustomPainter {
         ],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
     canvas.drawPath(fillPath, fillPaint);
-
-    // Line stroke
     final linePaint = Paint()
       ..color = Colors.redAccent
       ..style = PaintingStyle.stroke
@@ -563,17 +642,18 @@ class _HeartRateGraphPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
     canvas.drawPath(path, linePaint);
 
-    // Current point dot
-    final lastX = size.width;
-    final lastY = size.height - ((data.last - minVal) / range) * size.height;
-    canvas.drawCircle(
-      Offset(lastX, lastY),
-      5,
-      Paint()..color = Colors.redAccent,
-    );
-    canvas.drawCircle(Offset(lastX, lastY), 3, Paint()..color = Colors.white);
+    if (data.length > 1) {
+      final lastX = size.width;
+      final lastY = size.height - ((data.last - minVal) / range) * size.height;
+      canvas.drawCircle(
+        Offset(lastX, lastY),
+        5,
+        Paint()..color = Colors.redAccent,
+      );
+      canvas.drawCircle(Offset(lastX, lastY), 3, Paint()..color = Colors.white);
+    }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _HeartRateGraphPainter oldDelegate) => true;
 }

@@ -1,23 +1,45 @@
 import 'package:flutter/material.dart';
 import 'package:watch_connectivity/watch_connectivity.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'support_page.dart';
 import 'breathing_exercise.dart';
 import '../../services/wellness_engine.dart';
 import '../../widgets/wellness_widgets.dart';
+import '../../services/watch_service.dart';
+import '../../services/health_database_service.dart';
+
+class _ActivityItemData {
+  final IconData icon;
+  final String activity;
+  final DateTime timestamp;
+  final Color color;
+
+  _ActivityItemData({
+    required this.icon,
+    required this.activity,
+    required this.timestamp,
+    required this.color,
+  });
+}
 
 class Home extends StatefulWidget {
   final String? userSessionToken;
   final String? username;
+  final Function(int)? onNavigate;
 
-  const Home({super.key, this.userSessionToken, this.username});
+  const Home({
+    super.key,
+    this.userSessionToken,
+    this.username,
+    this.onNavigate,
+  });
 
   @override
   State<Home> createState() => _HomeState();
 }
 
 class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
-  // ── Watch Connectivity ──
-  final _watch = WatchConnectivity();
+  final _storage = const FlutterSecureStorage();
   String _receivedText = "Waiting for watch...";
   Color _watchColor = const Color(0xFF0D1B2A);
 
@@ -32,34 +54,34 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
   static const _purple = Color(0xFF7E57C2);
   static const _green = Color(0xFF66BB6A);
 
-  // ── Wellness Engine data ──
-  final _metrics = WellnessEngine.currentMetrics;
-  late final int _wellnessScore = WellnessEngine.calculateWellnessScore(
-    _metrics,
-  );
-  late final int _recoveryScore = WellnessEngine.calculateRecoveryScore(
-    _metrics,
-  );
-  late final String _recoveryStatus = WellnessEngine.getRecoveryStatus(
-    _recoveryScore,
-  );
-  late final List<HealthAlert> _alerts = WellnessEngine.detectHealthRisks(
-    _metrics,
-  );
-  late final List<WellnessRecommendation> _recommendations =
-      WellnessEngine.generateRecommendations(_metrics);
-  late final List<String> _notifications = WellnessEngine.getSmartNotifications(
-    _metrics,
-  );
+  // ── Dynamic State ──
+  WellnessMetrics? _metrics;
+  int _wellnessScore = 0;
+  int _recoveryScore = 0;
+  String _recoveryStatus = 'Calculating...';
+  List<HealthAlert> _alerts = [];
+  List<WellnessRecommendation> _recommendations = [];
+  List<String> _notifications = [];
+  bool _isLoadingData = true;
 
-  // ── Animation ──
+  // ── Recent Activity & Mood State ──
+  List<_ActivityItemData> _recentActivities = [];
+  bool _isLoadingActivities = true;
+  List<double> _weeklyMoodData = List.filled(7, 0.0);
+
   late AnimationController _scoreAnimController;
   late Animation<double> _scoreAnim;
 
   @override
   void initState() {
     super.initState();
-    _initWatchConnectivity();
+    WatchService().initialize();
+    _checkDiagnostics();
+    WatchService().selectedColor.addListener(_onColorChanged);
+
+    // ⚡ NEW: Listen for background database updates from the watch!
+    WatchService().syncTrigger.addListener(_refreshAllData);
+
     _scoreAnimController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -68,46 +90,207 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
       parent: _scoreAnimController,
       curve: Curves.easeOutCubic,
     );
+
+    _refreshAllData();
+    _loadCheckboxStates();
+  }
+
+  // ⚡ Helper to fetch everything again
+  void _refreshAllData() {
+    _loadDynamicData();
+    _loadRecentActivities();
+    _loadWeeklyMoodData();
+  }
+
+  // ==========================================
+  // 📊 FETCH MOOD DATA FROM SQLITE
+  // ==========================================
+  Future<void> _loadWeeklyMoodData() async {
+    final logs = await HealthDatabaseService.instance.getRecords(
+      'mental_health_logs',
+    );
+    final now = DateTime.now();
+    List<double> tempMood = List.filled(7, 0.0);
+    List<int> moodCounts = List.filled(7, 0);
+
+    for (var log in logs) {
+      final logDate = DateTime.parse(log['timestamp'] as String);
+      final difference = now.difference(logDate).inDays;
+
+      if (difference < 7) {
+        int dayIndex = logDate.weekday - 1; // 0=Mon, 6=Sun
+        int rawMood = log['mood_score'] as int;
+        double score = 1.0 - (rawMood / 4.0);
+        tempMood[dayIndex] += score;
+        moodCounts[dayIndex]++;
+      }
+    }
+
+    for (int i = 0; i < 7; i++) {
+      if (moodCounts[i] > 0) {
+        tempMood[i] = tempMood[i] / moodCounts[i];
+      }
+    }
+
+    if (tempMood.every((e) => e == 0.0)) {
+      tempMood = [0.6, 0.8, 0.5, 0.9, 0.7, 0.85, 0.6]; // Baseline fallback
+    }
+
+    if (mounted) {
+      setState(() {
+        _weeklyMoodData = tempMood;
+      });
+    }
+  }
+
+  // ==========================================
+  // 🕒 FETCH RECENT ACTIVITIES FROM SQLITE
+  // ==========================================
+  Future<void> _loadRecentActivities() async {
+    final db = HealthDatabaseService.instance;
+    List<_ActivityItemData> activities = [];
+
+    // 1. Fetch recent steps
+    final steps = await db.getRecords(
+      'step_logs',
+      orderBy: 'id DESC',
+      limit: 3,
+    );
+    for (var s in steps) {
+      activities.add(
+        _ActivityItemData(
+          icon: Icons.directions_walk_rounded,
+          activity: 'Walked ${s['steps']} steps',
+          timestamp: DateTime.parse(s['timestamp'] as String),
+          color: _accent,
+        ),
+      );
+    }
+
+    // 2. Fetch recent mood logs
+    final moods = await db.getRecords(
+      'mental_health_logs',
+      orderBy: 'id DESC',
+      limit: 3,
+    );
+    for (var m in moods) {
+      activities.add(
+        _ActivityItemData(
+          icon: Icons.mood_rounded,
+          activity: 'Logged mental health',
+          timestamp: DateTime.parse(m['timestamp'] as String),
+          color: _purple,
+        ),
+      );
+    }
+
+    // 3. Fetch recent sleep logs
+    final sleeps = await db.getRecords(
+      'sleep_logs',
+      orderBy: 'id DESC',
+      limit: 3,
+    );
+    for (var s in sleeps) {
+      activities.add(
+        _ActivityItemData(
+          icon: Icons.bedtime_rounded,
+          activity: 'Logged sleep stats',
+          timestamp: DateTime.parse(s['timestamp'] as String),
+          color: const Color(0xFF5C6BC0),
+        ),
+      );
+    }
+
+    // Sort all combined activities by the newest timestamp first
+    activities.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+    if (mounted) {
+      setState(() {
+        // Take only the top 3 most recent actions overall
+        _recentActivities = activities.take(3).toList();
+        _isLoadingActivities = false;
+      });
+    }
+  }
+
+  String _formatTimeAgo(DateTime date) {
+    final diff = DateTime.now().difference(date);
+    if (diff.inMinutes < 2) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} mins ago';
+    if (diff.inHours < 24) return '${diff.inHours} hours ago';
+    if (diff.inDays == 1) return 'Yesterday';
+    return '${diff.inDays} days ago';
+  }
+
+  // ==========================================
+  // 💾 PERSIST CHECKBOXES
+  // ==========================================
+  String get _todayKeyPrefix =>
+      DateTime.now().toIso8601String().substring(0, 10);
+
+  Future<void> _loadCheckboxStates() async {
+    final water = await _storage.read(key: '${_todayKeyPrefix}_water');
+    final walk = await _storage.read(key: '${_todayKeyPrefix}_walk');
+    final sleep = await _storage.read(key: '${_todayKeyPrefix}_sleep');
+
+    if (mounted) {
+      setState(() {
+        _waterChecked = water == 'true';
+        _walkChecked = walk == 'true';
+        _sleepChecked = sleep == 'true';
+      });
+    }
+  }
+
+  Future<void> _saveCheckboxState(String keySuffix, bool value) async {
+    await _storage.write(
+      key: '${_todayKeyPrefix}_$keySuffix',
+      value: value.toString(),
+    );
+  }
+
+  Future<void> _loadDynamicData() async {
+    final data = await WellnessEngine.getDynamicMetrics();
+    if (!mounted) return;
+
+    setState(() {
+      _metrics = data;
+      _wellnessScore = WellnessEngine.calculateWellnessScore(data);
+      _recoveryScore = WellnessEngine.calculateRecoveryScore(data);
+      _recoveryStatus = WellnessEngine.getRecoveryStatus(_recoveryScore);
+      _alerts = WellnessEngine.detectHealthRisks(data);
+      _recommendations = WellnessEngine.generateRecommendations(data);
+      _notifications = WellnessEngine.getSmartNotifications(data);
+      _isLoadingData = false;
+    });
+
     _scoreAnimController.forward();
   }
 
   @override
   void dispose() {
+    WatchService().selectedColor.removeListener(_onColorChanged);
+    WatchService().syncTrigger.removeListener(
+      _refreshAllData,
+    ); // Don't forget to dispose!
     _scoreAnimController.dispose();
     super.dispose();
   }
 
-  // ── Watch helpers (preserved) ──
-  void _initWatchConnectivity() async {
-    bool isSupported = await _watch.isSupported;
-    bool isPaired = await _watch.isPaired;
-    bool isReachable = await _watch.isReachable;
-
-    debugPrint("--- AURA FIT DIAGNOSTICS ---");
-    debugPrint("Supported: $isSupported");
-    debugPrint("Paired: $isPaired");
-    debugPrint("Reachable (Tunnel Open): $isReachable");
-
-    setState(() => _receivedText = "Reachable: $isReachable");
-
-    _watch.contextStream.listen((contextMap) {
-      if (contextMap.containsKey("selected_color")) {
-        _updateUI(contextMap["selected_color"]);
-      }
-    });
-
-    _watch.messageStream.listen((messageMap) {
-      if (messageMap.containsKey("selected_color")) {
-        _updateUI(messageMap["selected_color"]);
-      }
-    });
+  void _onColorChanged() {
+    final colorName = WatchService().selectedColor.value;
+    if (colorName.isNotEmpty && mounted) {
+      setState(() {
+        _receivedText = "Watch Selected: $colorName";
+        _watchColor = _getColorFromName(colorName);
+      });
+    }
   }
 
-  void _updateUI(String colorName) {
-    setState(() {
-      _receivedText = "Watch Selected: $colorName";
-      _watchColor = _getColorFromName(colorName);
-    });
+  void _checkDiagnostics() async {
+    final watch = WatchConnectivity();
+    bool isReachable = await watch.isReachable;
+    if (mounted) setState(() => _receivedText = "Reachable: $isReachable");
   }
 
   Color _getColorFromName(String name) {
@@ -123,9 +306,22 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
     }
   }
 
-  // ── Build ──
+  String _getHeartRateStatus(int bpm) {
+    if (bpm < 60) return 'Resting';
+    if (bpm <= 85) return 'Active';
+    if (bpm <= 120) return 'Exercising';
+    return 'Stressed';
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingData) {
+      return Container(
+        color: const Color(0xFF0D1B2A),
+        child: const Center(child: CircularProgressIndicator(color: _accent)),
+      );
+    }
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -140,15 +336,11 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Greeting Header
               _buildGreeting(),
               const SizedBox(height: 16),
-
-              // ── Smart Notification Banner ──
               if (_notifications.isNotEmpty) _buildNotificationBanner(),
               if (_notifications.isNotEmpty) const SizedBox(height: 20),
 
-              // 2. Wellness Score Hero Card
               AnimatedBuilder(
                 animation: _scoreAnim,
                 builder: (_, __) => WellnessScoreCard(
@@ -158,16 +350,12 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // ── Recovery Score ──
               RecoveryScoreCard(score: _recoveryScore, status: _recoveryStatus),
               const SizedBox(height: 20),
 
-              // 3. Quick Metrics Row
               _buildQuickMetrics(),
-              const SizedBox(height: 24),
 
-              // ── Health Alerts ──
+              const SizedBox(height: 24),
               if (_alerts.isNotEmpty) ...[
                 _buildSectionTitle('Health Alerts'),
                 const SizedBox(height: 12),
@@ -175,39 +363,27 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
                 const SizedBox(height: 20),
               ],
 
-              // ── Recommended for You ──
               _buildSectionTitle('Recommended for You'),
               const SizedBox(height: 12),
               _buildRecommendations(),
               const SizedBox(height: 24),
 
-              // 4. AI Insight Card
               _buildAIInsight(),
               const SizedBox(height: 24),
-
-              // 5. Quick Actions
               _buildSectionTitle('Quick Actions'),
               const SizedBox(height: 14),
               _buildQuickActions(),
               const SizedBox(height: 24),
-
-              // 6. Daily Self Care
               _buildSectionTitle('Daily Self Care'),
               const SizedBox(height: 14),
               _buildSelfCare(),
               const SizedBox(height: 24),
-
-              // 7. Support / Doctor
               _buildSectionTitle('Support'),
               const SizedBox(height: 14),
               _buildSupportCard(),
               const SizedBox(height: 24),
-
-              // 8. Breathing Exercise
               _buildBreathingShortcut(),
               const SizedBox(height: 24),
-
-              // 9. Upcoming Appointments
               _buildSectionTitle('Upcoming'),
               const SizedBox(height: 14),
               _buildAppointmentCard(
@@ -226,34 +402,31 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
                 color: _purple,
               ),
               const SizedBox(height: 24),
-
-              // 10. Weekly Mood
               _buildSectionTitle('Weekly Mood'),
               const SizedBox(height: 14),
               _buildWeeklyMood(),
               const SizedBox(height: 24),
 
-              // 11. Recent Activity
               _buildSectionTitle('Recent Activity'),
               const SizedBox(height: 14),
-              _buildActivityItem(
-                icon: Icons.self_improvement,
-                activity: 'Completed meditation',
-                time: '2 hours ago',
-                color: _purple,
-              ),
-              _buildActivityItem(
-                icon: Icons.directions_walk,
-                activity: 'Walked 2,500 steps',
-                time: '5 hours ago',
-                color: _accent,
-              ),
-              _buildActivityItem(
-                icon: Icons.check_circle,
-                activity: 'Logged daily mood',
-                time: 'Yesterday',
-                color: _green,
-              ),
+
+              if (_isLoadingActivities)
+                const Center(child: CircularProgressIndicator(color: _accent))
+              else if (_recentActivities.isEmpty)
+                Text(
+                  'No recent activity yet. Go log something!',
+                  style: TextStyle(color: Colors.white.withOpacity(0.5)),
+                )
+              else
+                ..._recentActivities.map(
+                  (a) => _buildActivityItem(
+                    icon: a.icon,
+                    activity: a.activity,
+                    time: _formatTimeAgo(a.timestamp),
+                    color: a.color,
+                  ),
+                ),
+
               const SizedBox(height: 40),
             ],
           ),
@@ -262,7 +435,46 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
     );
   }
 
-  // ─── Greeting ─────────────────────────────────────────────────────────────
+  Widget _buildQuickMetrics() {
+    return Row(
+      children: [
+        Expanded(
+          child: _miniMetric(
+            icon: Icons.psychology_rounded,
+            label: 'Mental',
+            value: '${(_metrics!.moodScore * 100).round()}',
+            sub: _metrics!.moodScore > 0.6 ? 'Stable' : 'Needs Care',
+            color: _purple,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _miniMetric(
+            icon: Icons.directions_walk_rounded,
+            label: 'Activity',
+            value: '${(_metrics!.activityLevel * 100).round()}%',
+            sub: _metrics!.activityLevel > 0.5 ? 'Active' : 'Low',
+            color: const Color(0xFF5C6BC0),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: ValueListenableBuilder<int>(
+            valueListenable: WatchService().currentBpm,
+            builder: (context, bpm, child) {
+              return _miniMetric(
+                icon: Icons.favorite_rounded,
+                label: 'Heart Rate',
+                value: '$bpm',
+                sub: _getHeartRateStatus(bpm),
+                color: Colors.redAccent,
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _buildGreeting() {
     final now = DateTime.now();
@@ -291,13 +503,12 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
     ];
     final dateStr =
         '${days[now.weekday - 1]}, ${months[now.month - 1]} ${now.day}';
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Hi Alex 👋',
-          style: TextStyle(
+        Text(
+          'Hi ${widget.username ?? "User"} 👋',
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 28,
             fontWeight: FontWeight.bold,
@@ -316,8 +527,6 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
       ],
     );
   }
-
-  // ─── Smart Notification Banner ──────────────────────────────────────────────
 
   Widget _buildNotificationBanner() {
     return Container(
@@ -358,8 +567,6 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
     );
   }
 
-  // ─── Recommendations ──────────────────────────────────────────────────────
-
   Widget _buildRecommendations() {
     final iconMap = {
       'directions_walk': Icons.directions_walk_rounded,
@@ -374,7 +581,6 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
       'sleep': const Color(0xFF5C6BC0),
       'nutrition': _accent,
     };
-
     return Column(
       children: _recommendations.map((r) {
         final color = colorMap[r.category] ?? _accent;
@@ -428,44 +634,6 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
     );
   }
 
-  // ─── Quick Metrics Row ────────────────────────────────────────────────────
-
-  Widget _buildQuickMetrics() {
-    return Row(
-      children: [
-        Expanded(
-          child: _miniMetric(
-            icon: Icons.psychology_rounded,
-            label: 'Mental',
-            value: '82',
-            sub: 'Stable',
-            color: _purple,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _miniMetric(
-            icon: Icons.bedtime_rounded,
-            label: 'Sleep',
-            value: '7h 12m',
-            sub: 'Good',
-            color: const Color(0xFF5C6BC0),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _miniMetric(
-            icon: Icons.favorite_rounded,
-            label: 'Heart Rate',
-            value: '72',
-            sub: 'Resting',
-            color: Colors.redAccent,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _miniMetric({
     required IconData icon,
     required String label,
@@ -505,8 +673,6 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
       ),
     );
   }
-
-  // ─── AI Insight Card ──────────────────────────────────────────────────────
 
   Widget _buildAIInsight() {
     return Container(
@@ -561,21 +727,31 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
     );
   }
 
-  // ─── Quick Actions ────────────────────────────────────────────────────────
-
   Widget _buildQuickActions() {
     final actions = [
-      {'icon': Icons.mood_rounded, 'label': 'Log Mood', 'color': _purple},
-      {'icon': Icons.air_rounded, 'label': 'Breathing', 'color': _green},
+      {
+        'icon': Icons.mood_rounded,
+        'label': 'Log Mood',
+        'color': _purple,
+        'targetIndex': 3,
+      },
+      {
+        'icon': Icons.air_rounded,
+        'label': 'Breathing',
+        'color': _green,
+        'targetIndex': -1,
+      },
       {
         'icon': Icons.bedtime_rounded,
         'label': 'Sleep Stats',
         'color': const Color(0xFF5C6BC0),
+        'targetIndex': 1,
       },
       {
         'icon': Icons.medical_services_rounded,
         'label': 'Book Doctor',
         'color': Colors.redAccent,
+        'targetIndex': 6,
       },
     ];
 
@@ -587,6 +763,8 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
           onTap: () {
             if (a['label'] == 'Breathing') {
               BreathingExercise.show(context);
+            } else if (widget.onNavigate != null) {
+              widget.onNavigate!(a['targetIndex'] as int);
             }
           },
           child: Column(
@@ -616,31 +794,24 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
     );
   }
 
-  // ─── Daily Self Care ──────────────────────────────────────────────────────
-
   Widget _buildSelfCare() {
     return Column(
       children: [
-        _buildCheckbox(
-          'Drink 8 glasses of water',
-          _waterChecked,
-          (v) => setState(() => _waterChecked = v!),
-        ),
-        _buildCheckbox(
-          'Take a 15 min walk',
-          _walkChecked,
-          (v) => setState(() => _walkChecked = v!),
-        ),
-        _buildCheckbox(
-          'Sleep by 10 PM',
-          _sleepChecked,
-          (v) => setState(() => _sleepChecked = v!),
-        ),
+        _buildCheckbox('Drink 8 glasses of water', _waterChecked, (v) {
+          setState(() => _waterChecked = v!);
+          _saveCheckboxState('water', v!);
+        }),
+        _buildCheckbox('Take a 15 min walk', _walkChecked, (v) {
+          setState(() => _walkChecked = v!);
+          _saveCheckboxState('walk', v!);
+        }),
+        _buildCheckbox('Sleep by 10 PM', _sleepChecked, (v) {
+          setState(() => _sleepChecked = v!);
+          _saveCheckboxState('sleep', v!);
+        }),
       ],
     );
   }
-
-  // ─── Support Card ─────────────────────────────────────────────────────────
 
   Widget _buildSupportCard() {
     return Container(
@@ -652,14 +823,10 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
       ),
       child: Row(
         children: [
-          CircleAvatar(
+          const CircleAvatar(
             radius: 26,
             backgroundColor: _purple,
-            child: const Icon(
-              Icons.medical_services,
-              color: Colors.white,
-              size: 26,
-            ),
+            child: Icon(Icons.medical_services, color: Colors.white, size: 26),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -704,8 +871,6 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
       ),
     );
   }
-
-  // ─── Breathing Shortcut ───────────────────────────────────────────────────
 
   Widget _buildBreathingShortcut() {
     return GestureDetector(
@@ -768,12 +933,8 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
     );
   }
 
-  // ─── Weekly Mood ──────────────────────────────────────────────────────────
-
   Widget _buildWeeklyMood() {
-    const moods = [0.6, 0.8, 0.5, 0.9, 0.7, 0.85, 0.6];
     const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -790,7 +951,7 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
             children: [
               Container(
                 width: 12,
-                height: 90 * moods[i],
+                height: 90 * _weeklyMoodData[i],
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
@@ -828,8 +989,6 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
       ),
     );
   }
-
-  // ─── Helper Widgets ───────────────────────────────────────────────────────
 
   Widget _buildSectionTitle(String title) {
     return Text(

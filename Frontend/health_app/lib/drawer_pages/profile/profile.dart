@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'dart:math'; // Needed for calculating initials safely
 import '../../login_page.dart';
 
 class Profile extends StatefulWidget {
@@ -10,15 +11,71 @@ class Profile extends StatefulWidget {
 }
 
 class _ProfileState extends State<Profile> {
+  final _storage = const FlutterSecureStorage();
+
   // ── Colors ──
   static const _bgCard = Color(0xFF152238);
   static const _accent = Color(0xFF4DD0E1);
   static const _purple = Color(0xFF7E57C2);
 
   // ── Toggle state ──
-  bool _darkMode = true;
+  bool _darkMode = true; // Ignored for now as requested
   bool _notifications = true;
   bool _metricUnits = false;
+
+  // ── User Data State ──
+  String _username = "User";
+  String _initials = "U";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPreferences();
+  }
+
+  // ==========================================
+  // ⚙️ LOAD SAVED PREFERENCES & USER DATA
+  // ==========================================
+  Future<void> _loadPreferences() async {
+    final notifs = await _storage.read(key: 'pref_notifications');
+    final metrics = await _storage.read(key: 'pref_metrics');
+
+    // Fetch the dynamic username saved during login/setup
+    final savedName = await _storage.read(key: 'username') ?? 'User';
+
+    // Generate initials safely (e.g., "Alex Johnson" -> "AJ", "Alex" -> "AL")
+    String init = "U";
+    if (savedName.isNotEmpty) {
+      final nameParts = savedName.trim().split(' ');
+      if (nameParts.length > 1) {
+        init = '${nameParts[0][0]}${nameParts[1][0]}'.toUpperCase();
+      } else {
+        init = savedName.substring(0, min(2, savedName.length)).toUpperCase();
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        if (notifs != null) _notifications = notifs == 'true';
+        if (metrics != null) _metricUnits = metrics == 'true';
+        _username = savedName;
+        _initials = init;
+      });
+    }
+  }
+
+  // ==========================================
+  // 💾 SAVE PREFERENCES ON TOGGLE
+  // ==========================================
+  Future<void> _toggleNotifications(bool value) async {
+    setState(() => _notifications = value);
+    await _storage.write(key: 'pref_notifications', value: value.toString());
+  }
+
+  Future<void> _toggleMetrics(bool value) async {
+    setState(() => _metricUnits = value);
+    await _storage.write(key: 'pref_metrics', value: value.toString());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -69,8 +126,7 @@ class _ProfileState extends State<Profile> {
     );
   }
 
-  // ─── Avatar Section ───────────────────────────────────────────────────────
-
+  // ⚡ UPDATED: Now uses dynamic _initials and _username
   Widget _buildAvatarSection() {
     return Column(
       children: [
@@ -91,12 +147,12 @@ class _ProfileState extends State<Profile> {
               ),
             ],
           ),
-          child: const CircleAvatar(
+          child: CircleAvatar(
             radius: 50,
-            backgroundColor: Color(0xFF1A2A40),
+            backgroundColor: const Color(0xFF1A2A40),
             child: Text(
-              'AJ',
-              style: TextStyle(
+              _initials,
+              style: const TextStyle(
                 color: _accent,
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
@@ -105,9 +161,9 @@ class _ProfileState extends State<Profile> {
           ),
         ),
         const SizedBox(height: 16),
-        const Text(
-          'Alex Johnson',
-          style: TextStyle(
+        Text(
+          _username,
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 24,
             fontWeight: FontWeight.bold,
@@ -122,8 +178,6 @@ class _ProfileState extends State<Profile> {
     );
   }
 
-  // ─── Personal Information ─────────────────────────────────────────────────
-
   Widget _buildPersonalInfo() {
     final info = [
       {'icon': Icons.cake_rounded, 'label': 'Age', 'value': '28 years'},
@@ -135,12 +189,12 @@ class _ProfileState extends State<Profile> {
       {
         'icon': Icons.height_rounded,
         'label': 'Height',
-        'value': '5\'10" (178 cm)',
+        'value': _metricUnits ? '178 cm' : '5\'10"',
       },
       {
         'icon': Icons.monitor_weight_outlined,
         'label': 'Weight',
-        'value': '165 lbs (75 kg)',
+        'value': _metricUnits ? '75 kg' : '165 lbs',
       },
     ];
 
@@ -193,8 +247,6 @@ class _ProfileState extends State<Profile> {
     );
   }
 
-  // ─── Preferences ──────────────────────────────────────────────────────────
-
   Widget _buildPreferences() {
     return Container(
       decoration: BoxDecoration(
@@ -208,21 +260,21 @@ class _ProfileState extends State<Profile> {
             Icons.dark_mode_rounded,
             'Dark Mode',
             _darkMode,
-            (v) => setState(() => _darkMode = v),
+            (v) => setState(() => _darkMode = v), // Visual only for now
           ),
           Divider(color: Colors.white.withOpacity(0.05), height: 1),
           _toggleRow(
             Icons.notifications_rounded,
             'Notifications',
             _notifications,
-            (v) => setState(() => _notifications = v),
+            _toggleNotifications, // Uses new persist method
           ),
           Divider(color: Colors.white.withOpacity(0.05), height: 1),
           _toggleRow(
             Icons.straighten_rounded,
             'Metric Units',
             _metricUnits,
-            (v) => setState(() => _metricUnits = v),
+            _toggleMetrics, // Uses new persist method
           ),
         ],
       ),
@@ -260,8 +312,6 @@ class _ProfileState extends State<Profile> {
     );
   }
 
-  // ─── Settings ─────────────────────────────────────────────────────────────
-
   Widget _buildSettings() {
     final settings = [
       {'icon': Icons.manage_accounts_rounded, 'label': 'Account Settings'},
@@ -269,7 +319,6 @@ class _ProfileState extends State<Profile> {
       {'icon': Icons.devices_rounded, 'label': 'Connected Devices'},
       {'icon': Icons.health_and_safety_rounded, 'label': 'Health Permissions'},
     ];
-
     return Container(
       decoration: BoxDecoration(
         color: _bgCard,
@@ -330,8 +379,6 @@ class _ProfileState extends State<Profile> {
     );
   }
 
-  // ─── Logout ───────────────────────────────────────────────────────────────
-
   Widget _buildLogoutButton() {
     return SizedBox(
       width: double.infinity,
@@ -367,14 +414,13 @@ class _ProfileState extends State<Profile> {
               ],
             ),
           );
-
           if (confirm == true && mounted) {
             const storage = FlutterSecureStorage();
-            await storage.deleteAll();
+            await storage.deleteAll(); // Safely wipes all data
             if (!mounted) return;
             Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(builder: (_) => LoginPage()),
+              MaterialPageRoute(builder: (_) => const LoginPage()),
               (route) => false,
             );
           }
@@ -396,8 +442,6 @@ class _ProfileState extends State<Profile> {
       ),
     );
   }
-
-  // ─── Helpers ──────────────────────────────────────────────────────────────
 
   Widget _buildSectionTitle(String title) {
     return Align(
