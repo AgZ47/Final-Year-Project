@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/health_database_service.dart';
 import '../../widgets/wellness_widgets.dart';
+import '../../core/theme/app_theme.dart'; // ⚡ NEW: Centralized theme
 
 class HabitsPage extends StatefulWidget {
   const HabitsPage({super.key});
@@ -11,11 +12,6 @@ class HabitsPage extends StatefulWidget {
 
 class _HabitsPageState extends State<HabitsPage>
     with SingleTickerProviderStateMixin {
-  static const _bgCard = Color(0xFF152238);
-  static const _accent = Color(0xFF4DD0E1);
-  static const _green = Color(0xFF66BB6A);
-  static const _orange = Color(0xFFFFB74D);
-
   late AnimationController _ringController;
   late Animation<double> _ringAnim;
 
@@ -38,15 +34,15 @@ class _HabitsPageState extends State<HabitsPage>
       parent: _ringController,
       curve: Curves.easeOutCubic,
     );
-
-    // Load habits from SQLite
     _loadHabits();
   }
 
   Future<void> _loadHabits() async {
     final data = await HealthDatabaseService.instance.getHabits();
+
+    if (!mounted) return; // ⚡ OPTIMIZATION: Safe async gap check
+
     setState(() {
-      // Convert to a modifiable list of maps so we can update state locally
       _habits = data.map((e) => Map<String, dynamic>.from(e)).toList();
       _isLoading = false;
     });
@@ -59,6 +55,8 @@ class _HabitsPageState extends State<HabitsPage>
 
     // Update Database
     await HealthDatabaseService.instance.toggleHabitStatus(id, isDone);
+
+    if (!mounted) return; // ⚡ OPTIMIZATION: Prevent crash if navigated away
 
     // Update UI State
     setState(() {
@@ -77,62 +75,62 @@ class _HabitsPageState extends State<HabitsPage>
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: _accent));
+      return Container(
+        color: AppTheme.bgDark,
+        child: const Center(
+          child: CircularProgressIndicator(color: AppTheme.accent),
+        ),
+      );
     }
 
     return Container(
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF0B1527), Color(0xFF0D1B2A), Color(0xFF132E4A)],
-        ),
+        gradient: AppTheme.mainBackgroundGradient, // ⚡ Centralized theme
       ),
       child: SafeArea(
-        child: SingleChildScrollView(
+        // ⚡ OPTIMIZATION: Switched to ListView for better scroll memory management
+        child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Daily Habits',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
+          children: [
+            const Text(
+              'Daily Habits',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Build healthy routines',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
-                  fontSize: 15,
-                ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Build healthy routines',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.5),
+                fontSize: 15,
               ),
-              const SizedBox(height: 24),
+            ),
+            const SizedBox(height: 24),
 
-              _buildCompletionCard(),
-              const SizedBox(height: 24),
-              _buildStreakHighlights(),
-              const SizedBox(height: 24),
+            _buildCompletionCard(),
+            const SizedBox(height: 24),
 
-              _sectionTitle('Today\'s Goals'),
-              const SizedBox(height: 12),
+            _buildStreakHighlights(),
+            const SizedBox(height: 24),
 
-              ...List.generate(_habits.length, (i) {
-                final h = _habits[i];
-                return HabitTrackerCard(
-                  title: h['title'] as String,
-                  emoji: h['emoji'] as String,
-                  completed: h['is_done'] == 1,
-                  streak: h['streak'] as int,
-                  onToggle: (v) => _toggleHabit(i, v),
-                );
-              }),
-              const SizedBox(height: 32),
-            ],
-          ),
+            _sectionTitle('Today\'s Goals'),
+            const SizedBox(height: 12),
+
+            ...List.generate(_habits.length, (i) {
+              final h = _habits[i];
+              return HabitTrackerCard(
+                title: h['title'] as String,
+                emoji: h['emoji'] as String,
+                completed: h['is_done'] == 1,
+                streak: h['streak'] as int,
+                onToggle: (v) => _toggleHabit(i, v),
+              );
+            }),
+            const SizedBox(height: 32),
+          ],
         ),
       ),
     );
@@ -144,12 +142,15 @@ class _HabitsPageState extends State<HabitsPage>
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [_accent.withOpacity(0.1), _green.withOpacity(0.08)],
+          colors: [
+            AppTheme.accent.withOpacity(0.1),
+            AppTheme.green.withOpacity(0.08),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: _accent.withOpacity(0.2)),
+        border: Border.all(color: AppTheme.accent.withOpacity(0.2)),
       ),
       child: Row(
         children: [
@@ -167,7 +168,9 @@ class _HabitsPageState extends State<HabitsPage>
                       strokeWidth: 8,
                       backgroundColor: Colors.white.withOpacity(0.06),
                       valueColor: AlwaysStoppedAnimation(
-                        _completionPct >= 1.0 ? _green : _accent,
+                        _completionPct >= 1.0
+                            ? AppTheme.green
+                            : AppTheme.accent,
                       ),
                       strokeCap: StrokeCap.round,
                     ),
@@ -215,13 +218,13 @@ class _HabitsPageState extends State<HabitsPage>
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: _green.withOpacity(0.15),
+                      color: AppTheme.green.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Text(
                       '🎉 All done!',
                       style: TextStyle(
-                        color: _green,
+                        color: AppTheme.green,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -238,6 +241,7 @@ class _HabitsPageState extends State<HabitsPage>
   Widget _buildStreakHighlights() {
     final topStreaks = _habits.where((h) => (h['streak'] as int) > 0).toList()
       ..sort((a, b) => (b['streak'] as int).compareTo(a['streak'] as int));
+
     if (topStreaks.isEmpty) return const SizedBox.shrink();
 
     return SizedBox(
@@ -252,9 +256,9 @@ class _HabitsPageState extends State<HabitsPage>
             width: 110,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: _bgCard,
+              color: AppTheme.bgCard,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _orange.withOpacity(0.2)),
+              border: Border.all(color: AppTheme.orange.withOpacity(0.2)),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -272,7 +276,7 @@ class _HabitsPageState extends State<HabitsPage>
                     Text(
                       '${h['streak']} days',
                       style: const TextStyle(
-                        color: _orange,
+                        color: AppTheme.orange,
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
                       ),

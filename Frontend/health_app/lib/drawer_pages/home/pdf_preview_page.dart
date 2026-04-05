@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import '../../services/pdf_report_service.dart';
+import '../../core/theme/app_theme.dart'; // ⚡ NEW: Centralized theme
 
 class PdfPreviewPage extends StatelessWidget {
   final String doctorName;
@@ -17,7 +18,7 @@ class PdfPreviewPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1B2A),
+      backgroundColor: AppTheme.bgDark, // ⚡ Themed background
       appBar: AppBar(
         title: const Text(
           'Health Report Preview',

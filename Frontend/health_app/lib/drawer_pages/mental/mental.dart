@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../home/breathing_exercise.dart';
 import '../../services/health_database_service.dart';
+import '../../core/theme/app_theme.dart'; // ⚡ NEW: Centralized theme
 
 class Mental extends StatefulWidget {
   const Mental({super.key});
@@ -29,13 +30,6 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
 
   static const _dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  // ── Colors ──
-  static const _bgDark = Color(0xFF0D1B2A);
-  static const _bgCard = Color(0xFF152238);
-  static const _accent = Color(0xFF4DD0E1);
-  static const _purple = Color(0xFF7E57C2);
-  static const _indigo = Color(0xFF5C6BC0);
-
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
@@ -52,7 +46,7 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
     );
     _fadeController.forward();
 
-    _loadWeeklyMoodData(); // ⚡ NEW: Fetch data on load
+    _loadWeeklyMoodData();
   }
 
   @override
@@ -78,10 +72,7 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
       final difference = now.difference(logDate).inDays;
 
       if (difference < 7) {
-        // Only look at the last 7 days
         int dayIndex = logDate.weekday - 1; // 0=Mon, 6=Sun
-
-        // Convert UI mood index (0=Happy, 4=Sad) to a 1.0 (Good) to 0.0 (Bad) scale
         int rawMood = log['mood_score'] as int;
         double score = 1.0 - (rawMood / 4.0);
 
@@ -90,14 +81,12 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
       }
     }
 
-    // Average out the scores for days with multiple logs
     for (int i = 0; i < 7; i++) {
       if (moodCounts[i] > 0) {
         tempMood[i] = tempMood[i] / moodCounts[i];
       }
     }
 
-    // Add a baseline if there is absolutely no data so the UI doesn't look broken
     if (tempMood.every((e) => e == 0.0)) {
       tempMood = [0.6, 0.8, 0.5, 0.9, 0.7, 0.85, 0.6];
     }
@@ -116,9 +105,9 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
   }
 
   Color get _stressColor {
-    if (_stressLevel < 0.33) return const Color(0xFF66BB6A);
-    if (_stressLevel < 0.66) return const Color(0xFFFFB74D);
-    return const Color(0xFFEF5350);
+    if (_stressLevel < 0.33) return AppTheme.green;
+    if (_stressLevel < 0.66) return AppTheme.orange;
+    return AppTheme.red;
   }
 
   // ==========================================
@@ -129,7 +118,7 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please select a mood first!'),
-          backgroundColor: Colors.orange,
+          backgroundColor: AppTheme.orange,
         ),
       );
       return;
@@ -156,7 +145,6 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
       ),
     );
 
-    // ⚡ NEW: Refresh the chart instantly after saving
     _loadWeeklyMoodData();
   }
 
@@ -166,97 +154,91 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
       opacity: _fadeAnimation,
       child: Container(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF0B1527), _bgDark, Color(0xFF132E4A)],
-          ),
+          gradient: AppTheme.mainBackgroundGradient, // ⚡ Centralized Theme
         ),
         child: SafeArea(
-          child: SingleChildScrollView(
+          // ⚡ OPTIMIZATION: Converted to ListView
+          child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Header ──
-                const Text(
-                  'Mental Health',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
+            children: [
+              // ── Header ──
+              const Text(
+                'Mental Health',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Track your emotional well-being',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.5),
-                    fontSize: 15,
-                  ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Track your emotional well-being',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.5),
+                  fontSize: 15,
                 ),
-                const SizedBox(height: 28),
+              ),
+              const SizedBox(height: 28),
 
-                // ── Mood Tracker ──
-                _buildSectionTitle('How are you feeling?'),
-                const SizedBox(height: 14),
-                _buildMoodSelector(),
-                const SizedBox(height: 28),
+              // ── Mood Tracker ──
+              _buildSectionTitle('How are you feeling?'),
+              const SizedBox(height: 14),
+              _buildMoodSelector(),
+              const SizedBox(height: 28),
 
-                // ── Stress Level ──
-                _buildSectionTitle('Stress Level'),
-                const SizedBox(height: 14),
-                _buildStressSlider(),
-                const SizedBox(height: 28),
+              // ── Stress Level ──
+              _buildSectionTitle('Stress Level'),
+              const SizedBox(height: 14),
+              _buildStressSlider(),
+              const SizedBox(height: 28),
 
-                // ── Save Button ──
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isSaving ? null : _saveMentalLog,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _purple,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
+              // ── Save Button ──
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _saveMentalLog,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.purple,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    child: _isSaving
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text(
-                            'Save Daily Log',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
                   ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text(
+                          'Save Daily Log',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
-                const SizedBox(height: 28),
+              ),
+              const SizedBox(height: 28),
 
-                // ── Guided Breathing ──
-                _buildBreathingButton(),
-                const SizedBox(height: 28),
+              // ── Guided Breathing ──
+              _buildBreathingButton(),
+              const SizedBox(height: 28),
 
-                // ── Weekly Mood Chart ──
-                _buildSectionTitle('Weekly Mood'),
-                const SizedBox(height: 14),
-                _buildWeeklyChart(),
-                const SizedBox(height: 28),
+              // ── Weekly Mood Chart ──
+              _buildSectionTitle('Weekly Mood'),
+              const SizedBox(height: 14),
+              _buildWeeklyChart(),
+              const SizedBox(height: 28),
 
-                // ── AI Mental Insight ──
-                _buildAIInsight(),
-                const SizedBox(height: 32),
-              ],
-            ),
+              // ── AI Mental Insight ──
+              _buildAIInsight(),
+              const SizedBox(height: 32),
+            ],
           ),
         ),
       ),
@@ -278,24 +260,34 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
             width: 62,
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
-              color: isSelected ? _accent.withOpacity(0.15) : _bgCard,
+              color: isSelected
+                  ? AppTheme.accent.withOpacity(0.15)
+                  : AppTheme.bgCard,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: isSelected ? _accent : Colors.white10,
+                color: isSelected ? AppTheme.accent : Colors.white10,
                 width: isSelected ? 2 : 1,
               ),
               boxShadow: isSelected
-                  ? [BoxShadow(color: _accent.withOpacity(0.3), blurRadius: 12)]
+                  ? [
+                      BoxShadow(
+                        color: AppTheme.accent.withOpacity(0.3),
+                        blurRadius: 12,
+                      ),
+                    ]
                   : [],
             ),
             child: Column(
               children: [
-                Text(_moods[i]['emoji']!, style: const TextStyle(fontSize: 28)),
+                Text(
+                  _moods[i]['emoji'] as String,
+                  style: const TextStyle(fontSize: 28),
+                ),
                 const SizedBox(height: 6),
                 Text(
-                  _moods[i]['label']!,
+                  _moods[i]['label'] as String,
                   style: TextStyle(
-                    color: isSelected ? _accent : Colors.white60,
+                    color: isSelected ? AppTheme.accent : Colors.white60,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
@@ -314,7 +306,7 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: _bgCard,
+        color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white10),
       ),
@@ -409,14 +401,14 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [_purple, _purple.withOpacity(0.7)],
+            colors: [AppTheme.purple, AppTheme.purple.withOpacity(0.7)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: _purple.withOpacity(0.3),
+              color: AppTheme.purple.withOpacity(0.3),
               blurRadius: 16,
               offset: const Offset(0, 6),
             ),
@@ -469,7 +461,7 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: _bgCard,
+        color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white10),
       ),
@@ -477,9 +469,10 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: List.generate(7, (i) {
-          final h = _weeklyMoodData[i]; // ⚡ UPDATED: Uses dynamic data
+          final h = _weeklyMoodData[i];
           final isToday = i == DateTime.now().weekday - 1;
-          final barColor = isToday ? _accent : _indigo;
+          final barColor = isToday ? AppTheme.accent : AppTheme.indigo;
+
           return Column(
             children: [
               Container(
@@ -495,7 +488,7 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
                   boxShadow: isToday
                       ? [
                           BoxShadow(
-                            color: _accent.withOpacity(0.4),
+                            color: AppTheme.accent.withOpacity(0.4),
                             blurRadius: 8,
                           ),
                         ]
@@ -508,7 +501,7 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
-                  color: isToday ? _accent : Colors.white54,
+                  color: isToday ? AppTheme.accent : Colors.white54,
                 ),
               ),
             ],
@@ -524,9 +517,9 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: _bgCard,
+        color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _purple.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.purple.withOpacity(0.3)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -534,12 +527,12 @@ class _MentalState extends State<Mental> with SingleTickerProviderStateMixin {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: _purple.withOpacity(0.15),
+              color: AppTheme.purple.withOpacity(0.15),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
               Icons.lightbulb_rounded,
-              color: _purple,
+              color: AppTheme.purple,
               size: 24,
             ),
           ),

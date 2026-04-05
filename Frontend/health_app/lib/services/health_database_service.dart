@@ -45,8 +45,11 @@ class HealthDatabaseService {
   }
 
   Future _createDB(Database db, int version) async {
+    // We use a batch to execute table and index creation efficiently
+    final batch = db.batch();
+
     // 1. WALKING & STEPS
-    await db.execute('''
+    batch.execute('''
       CREATE TABLE step_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         steps INTEGER NOT NULL,
@@ -55,9 +58,10 @@ class HealthDatabaseService {
         timestamp TEXT NOT NULL 
       )
     ''');
+    batch.execute('CREATE INDEX idx_steps_time ON step_logs(timestamp)');
 
     // 2. WORKOUTS
-    await db.execute('''
+    batch.execute('''
       CREATE TABLE workouts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         workout_type TEXT NOT NULL, 
@@ -67,21 +71,23 @@ class HealthDatabaseService {
         timestamp TEXT NOT NULL
       )
     ''');
+    batch.execute('CREATE INDEX idx_workouts_time ON workouts(timestamp)');
 
     // 3. SLEEP CYCLES
-    await db.execute('''
+    batch.execute('''
       CREATE TABLE sleep_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         bedtime TEXT NOT NULL,      
         wake_time TEXT NOT NULL,    
         sleep_quality INTEGER,      
         deep_sleep_minutes INTEGER, 
-        timestamp TEXT NOT NULL     
+        timestamp TEXT NOT NULL   
       )
     ''');
+    batch.execute('CREATE INDEX idx_sleep_time ON sleep_logs(timestamp)');
 
     // 4. MENTAL WELLBEING
-    await db.execute('''
+    batch.execute('''
       CREATE TABLE mental_health_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         mood_score INTEGER NOT NULL, 
@@ -90,9 +96,12 @@ class HealthDatabaseService {
         timestamp TEXT NOT NULL
       )
     ''');
+    batch.execute(
+      'CREATE INDEX idx_mental_time ON mental_health_logs(timestamp)',
+    );
 
-    // 5. HABITS (New - Replaces hardcoded UI state)
-    await db.execute('''
+    // 5. HABITS
+    batch.execute('''
       CREATE TABLE habits (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
@@ -102,8 +111,8 @@ class HealthDatabaseService {
       )
     ''');
 
-    // 6. GOALS (New - Replaces hardcoded UI state)
-    await db.execute('''
+    // 6. GOALS
+    batch.execute('''
       CREATE TABLE goals (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
@@ -114,7 +123,7 @@ class HealthDatabaseService {
       )
     ''');
 
-    // Seed initial data so the UI isn't blank on first launch
+    await batch.commit(noResult: true);
     await _seedInitialHabits(db);
   }
 
@@ -141,16 +150,17 @@ class HealthDatabaseService {
       {'title': 'Meditate 5 minutes', 'emoji': '🧠', 'is_done': 0, 'streak': 0},
     ];
 
+    final batch = db.batch();
     for (var habit in initialHabits) {
-      await db.insert('habits', habit);
+      batch.insert('habits', habit);
     }
+    await batch.commit(noResult: true);
   }
 
   // ==========================================
-  // 📝 GENERIC CRUD OPERATIONS
+  // 📝 GENERIC CRUD OPERATIONS & BATCHING
   // ==========================================
 
-  /// Insert a record into any table
   Future<int> insertRecord(String table, Map<String, dynamic> data) async {
     final db = await instance.database;
     return await db.insert(
@@ -160,17 +170,36 @@ class HealthDatabaseService {
     );
   }
 
-  /// Fetch all records from a table (optional limit/order)
+  /// ⚡ OPTIMIZATION: Batch insert for watch syncing
+  Future<void> batchInsert(
+    String table,
+    List<Map<String, dynamic>> records,
+  ) async {
+    final db = await instance.database;
+    final batch = db.batch();
+    for (var record in records) {
+      batch.insert(table, record, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
+  }
+
   Future<List<Map<String, dynamic>>> getRecords(
     String table, {
     String? orderBy,
     int? limit,
+    String? where,
+    List<dynamic>? whereArgs,
   }) async {
     final db = await instance.database;
-    return await db.query(table, orderBy: orderBy, limit: limit);
+    return await db.query(
+      table,
+      orderBy: orderBy,
+      limit: limit,
+      where: where,
+      whereArgs: whereArgs,
+    );
   }
 
-  /// Delete a record by ID
   Future<int> deleteRecord(String table, int id) async {
     final db = await instance.database;
     return await db.delete(table, where: 'id = ?', whereArgs: [id]);
@@ -179,8 +208,6 @@ class HealthDatabaseService {
   // ==========================================
   // 🎯 SPECIFIC FEATURE OPERATIONS
   // ==========================================
-
-  // --- HABITS ---
 
   Future<List<Map<String, dynamic>>> getHabits() async {
     return await getRecords('habits', orderBy: 'id ASC');
@@ -196,8 +223,6 @@ class HealthDatabaseService {
     );
   }
 
-  // --- GOALS ---
-
   Future<List<Map<String, dynamic>>> getGoals() async {
     return await getRecords('goals', orderBy: 'id ASC');
   }
@@ -210,24 +235,6 @@ class HealthDatabaseService {
       where: 'id = ?',
       whereArgs: [id],
     );
-  }
-
-  Future<int> updateGoalProgress(int id, double progress) async {
-    final db = await instance.database;
-    return await db.update(
-      'goals',
-      {'progress': progress},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-  }
-
-  // --- VITALS & LOGS (Metrics) ---
-
-  Future<void> logHeartRate(int bpm) async {
-    // Usually, you'd store this in a dedicated heart_rate table
-    // For now, we can use the mental_health_logs or create a new table
-    // if you want to track high-frequency HR data locally.
   }
 
   Future<void> logSteps(int steps, double distance, double calories) async {
@@ -243,7 +250,7 @@ class HealthDatabaseService {
     await insertRecord('mental_health_logs', {
       'mood_score': score,
       'stress_level': stressLevel,
-      'journal_entry': notes ?? '', // ⚡ Stores the questionnaire scores
+      'journal_entry': notes ?? '',
       'timestamp': DateTime.now().toIso8601String(),
     });
   }

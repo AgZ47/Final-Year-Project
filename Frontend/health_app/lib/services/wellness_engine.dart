@@ -7,6 +7,8 @@ class WellnessMetrics {
   final double stressLevel; // 0.0–1.0 (higher = more stressed)
   final double heartRateStability; // 0.0–1.0
   final double activityLevel; // 0.0–1.0
+  final bool hasGHQToday; // ⚡ NEW: Track daily GHQ survey
+  final bool hasMDQToday; // ⚡ NEW: Track daily MDQ survey
 
   const WellnessMetrics({
     required this.sleepQuality,
@@ -14,6 +16,8 @@ class WellnessMetrics {
     required this.stressLevel,
     required this.heartRateStability,
     required this.activityLevel,
+    required this.hasGHQToday,
+    required this.hasMDQToday,
   });
 }
 
@@ -115,73 +119,84 @@ class WellnessEngine {
   static const _heartWeight = 0.15;
   static const _activityWeight = 0.10;
 
-  // Static Fallbacks (kept temporarily so Insights/Reports don't break during transition)
+  // Static Fallbacks
   static const currentMetrics = WellnessMetrics(
     sleepQuality: 0.82,
     moodScore: 0.75,
     stressLevel: 0.30,
     heartRateStability: 0.85,
     activityLevel: 0.60,
+    hasGHQToday: false,
+    hasMDQToday: false,
   );
+
   static const previousMetrics = WellnessMetrics(
     sleepQuality: 0.70,
     moodScore: 0.65,
     stressLevel: 0.45,
     heartRateStability: 0.80,
     activityLevel: 0.50,
+    hasGHQToday: true,
+    hasMDQToday: true,
   );
 
   // ==========================================
-  // 🚀 NEW: DYNAMIC DATA FETCHING
+  // 🚀 DYNAMIC DATA FETCHING
   // ==========================================
   static Future<WellnessMetrics> getDynamicMetrics() async {
     final db = HealthDatabaseService.instance;
-
-    // 1. Fetch Today's Steps
     final now = DateTime.now();
     final todayStr = now.toIso8601String().substring(0, 10);
-    final stepLogs = await db.getRecords('step_logs');
 
+    // 1. Fetch Today's Steps
+    final stepLogs = await db.getRecords('step_logs');
     int totalSteps = 0;
     for (var log in stepLogs) {
       if (log['timestamp'].toString().startsWith(todayStr)) {
         totalSteps += (log['steps'] as int);
       }
     }
-    // Assume 8,000 steps is a 100% (1.0) activity level for the day
     double activityLevel = (totalSteps / 8000.0).clamp(0.0, 1.0);
 
-    // 2. Fetch Latest Mental Health Log
+    // 2. Fetch Mental Health Logs (Expanded limit to scan today's tests)
     final moodLogs = await db.getRecords(
       'mental_health_logs',
       orderBy: 'id DESC',
-      limit: 1,
+      limit: 20,
     );
+
     double moodScore = 0.75; // Default Baseline
     double stressLevel = 0.30; // Default Baseline
+    bool hasGHQ = false;
+    bool hasMDQ = false;
 
     if (moodLogs.isNotEmpty) {
+      // Use the most recent log for general mood/stress levels
       final latest = moodLogs.first;
-
-      // Convert UI mood index (0=Happy, 4=Sad) to an engine score (1.0=Good, 0.0=Bad)
       int rawMood = latest['mood_score'] as int;
       moodScore = 1.0 - (rawMood / 4.0);
 
-      // Convert UI stress (saved as 0-100) back to 0.0-1.0
       int rawStress = latest['stress_level'] as int;
       stressLevel = (rawStress / 100.0).clamp(0.0, 1.0);
+
+      // ⚡ Check if GHQ/MDQ tests were taken today by looking at the journal entries
+      for (var log in moodLogs) {
+        if (log['timestamp'].toString().startsWith(todayStr)) {
+          final entry = (log['journal_entry'] ?? '') as String;
+          if (entry.contains('GHQ')) hasGHQ = true;
+          if (entry.contains('MDQ')) hasMDQ = true;
+        }
+      }
     }
 
-    // Return real metrics!
     return WellnessMetrics(
-      sleepQuality: 0.82, // Hardcoded baseline until sleep logs are wired
+      sleepQuality: 0.82,
       moodScore: moodScore,
       stressLevel: stressLevel,
-      heartRateStability:
-          0.85, // We pull HR dynamically in the UI directly from watch
-      activityLevel: activityLevel > 0
-          ? activityLevel
-          : 0.4, // Keep a base so UI isn't dead on fresh install
+      heartRateStability: 0.85,
+      activityLevel: activityLevel > 0 ? activityLevel : 0.4,
+      hasGHQToday: hasGHQ,
+      hasMDQToday: hasMDQ,
     );
   }
 
@@ -193,6 +208,7 @@ class WellnessEngine {
         ((1 - m.stressLevel) * _stressWeight) +
         (m.heartRateStability * _heartWeight) +
         (m.activityLevel * _activityWeight);
+
     return (raw * 100).round().clamp(0, 100);
   }
 
@@ -210,6 +226,7 @@ class WellnessEngine {
         (m.sleepQuality * 0.45) +
         ((1 - m.stressLevel) * 0.30) +
         (m.heartRateStability * 0.25);
+
     return (raw * 100).round().clamp(0, 100);
   }
 
@@ -222,7 +239,8 @@ class WellnessEngine {
   // ── Health Risk Detection ──
   static List<HealthAlert> detectHealthRisks(WellnessMetrics m) {
     final alerts = <HealthAlert>[];
-    if (m.sleepQuality < 0.5)
+
+    if (m.sleepQuality < 0.5) {
       alerts.add(
         const HealthAlert(
           title: 'Poor Sleep Pattern',
@@ -232,7 +250,8 @@ class WellnessEngine {
           icon: '😴',
         ),
       );
-    if (m.stressLevel > 0.7)
+    }
+    if (m.stressLevel > 0.7) {
       alerts.add(
         const HealthAlert(
           title: 'High Stress Levels',
@@ -242,7 +261,8 @@ class WellnessEngine {
           icon: '😰',
         ),
       );
-    if (m.heartRateStability < 0.6)
+    }
+    if (m.heartRateStability < 0.6) {
       alerts.add(
         const HealthAlert(
           title: 'Elevated Heart Rate',
@@ -252,7 +272,8 @@ class WellnessEngine {
           icon: '❤️',
         ),
       );
-    if (m.activityLevel < 0.3)
+    }
+    if (m.activityLevel < 0.3) {
       alerts.add(
         const HealthAlert(
           title: 'Low Activity',
@@ -262,7 +283,8 @@ class WellnessEngine {
           icon: '🚶',
         ),
       );
-    if (m.moodScore < 0.4)
+    }
+    if (m.moodScore < 0.4) {
       alerts.add(
         const HealthAlert(
           title: 'Mood Decline',
@@ -272,6 +294,7 @@ class WellnessEngine {
           icon: '😔',
         ),
       );
+    }
     return alerts;
   }
 
@@ -280,7 +303,8 @@ class WellnessEngine {
     WellnessMetrics m,
   ) {
     final recs = <WellnessRecommendation>[];
-    if (m.activityLevel < 0.5)
+
+    if (m.activityLevel < 0.5) {
       recs.add(
         const WellnessRecommendation(
           title: 'Take a short walk',
@@ -290,7 +314,8 @@ class WellnessEngine {
           iconName: 'directions_walk',
         ),
       );
-    if (m.stressLevel > 0.4)
+    }
+    if (m.stressLevel > 0.4) {
       recs.add(
         const WellnessRecommendation(
           title: 'Try breathing exercises',
@@ -300,7 +325,8 @@ class WellnessEngine {
           iconName: 'air',
         ),
       );
-    if (m.sleepQuality < 0.8)
+    }
+    if (m.sleepQuality < 0.8) {
       recs.add(
         const WellnessRecommendation(
           title: 'Sleep earlier tonight',
@@ -310,7 +336,8 @@ class WellnessEngine {
           iconName: 'bedtime',
         ),
       );
-    if (m.moodScore < 0.7)
+    }
+    if (m.moodScore < 0.7) {
       recs.add(
         const WellnessRecommendation(
           title: 'Practice gratitude',
@@ -320,6 +347,7 @@ class WellnessEngine {
           iconName: 'favorite',
         ),
       );
+    }
     recs.add(
       const WellnessRecommendation(
         title: 'Stay hydrated',
@@ -484,14 +512,28 @@ class WellnessEngine {
   // ── Smart Notifications ──
   static List<String> getSmartNotifications(WellnessMetrics m) {
     final notifications = <String>[];
-    if (m.stressLevel > 0.4)
+
+    // ⚡ NEW: Prompt user to take tests if they haven't yet
+    if (!m.hasGHQToday) {
+      notifications.add('📋 Take your daily GHQ survey on your watch');
+    }
+    if (!m.hasMDQToday) {
+      notifications.add('🧠 Quick MDQ mental check-in pending');
+    }
+
+    if (m.stressLevel > 0.4) {
       notifications.add('🧘 Time for your breathing exercise');
-    if (m.moodScore < 0.7)
+    }
+    if (m.moodScore < 0.7) {
       notifications.add('📝 You haven\'t logged your mood today');
-    if (m.sleepQuality < 0.75)
+    }
+    if (m.sleepQuality < 0.75) {
       notifications.add('🌙 Try going to bed earlier tonight');
-    if (m.activityLevel < 0.5)
+    }
+    if (m.activityLevel < 0.5) {
       notifications.add('🚶 A short walk could boost your energy');
+    }
+
     return notifications;
   }
 }

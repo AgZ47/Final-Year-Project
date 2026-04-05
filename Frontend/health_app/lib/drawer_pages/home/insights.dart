@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../services/wellness_engine.dart';
 import '../../widgets/wellness_widgets.dart';
+import '../../core/theme/app_theme.dart'; // ⚡ NEW: Centralized theme
 
 class InsightsPage extends StatelessWidget {
   const InsightsPage({super.key});
-
-  static const _bgCard = Color(0xFF152238);
-  static const _accent = Color(0xFF4DD0E1);
-  static const _green = Color(0xFF66BB6A);
 
   @override
   Widget build(BuildContext context) {
@@ -16,53 +13,47 @@ class InsightsPage extends StatelessWidget {
 
     return Container(
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF0B1527), Color(0xFF0D1B2A), Color(0xFF132E4A)],
-        ),
+        gradient: AppTheme.mainBackgroundGradient, // ⚡ Centralized Theme
       ),
       child: SafeArea(
-        child: SingleChildScrollView(
+        // ⚡ OPTIMIZATION: Converted to ListView
+        child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Health Insights',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
+          children: [
+            const Text(
+              'Health Insights',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Patterns & correlations in your data',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
-                  fontSize: 15,
-                ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Patterns & correlations in your data',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.5),
+                fontSize: 15,
               ),
-              const SizedBox(height: 24),
+            ),
+            const SizedBox(height: 24),
 
-              // ── Weekly Changes ──
-              _sectionTitle('Weekly Changes'),
-              const SizedBox(height: 12),
-              _buildWeeklyChanges(improvements),
-              const SizedBox(height: 24),
+            // ── Weekly Changes ──
+            _sectionTitle('Weekly Changes'),
+            const SizedBox(height: 12),
+            _buildWeeklyChanges(improvements),
+            const SizedBox(height: 24),
 
-              // ── Pattern Insights ──
-              _sectionTitle('Discovered Patterns'),
-              const SizedBox(height: 12),
-              ...insights.map((i) => InsightCard(insight: i)),
+            // ── Pattern Insights ──
+            _sectionTitle('Discovered Patterns'),
+            const SizedBox(height: 12),
+            ...insights.map((i) => InsightCard(insight: i)),
 
-              // ── Summary ──
-              const SizedBox(height: 16),
-              _buildAISummary(),
-              const SizedBox(height: 32),
-            ],
-          ),
+            // ── Summary ──
+            const SizedBox(height: 16),
+            _buildAISummary(),
+            const SizedBox(height: 32),
+          ],
         ),
       ),
     );
@@ -79,13 +70,14 @@ class InsightsPage extends StatelessWidget {
         final isPositive = (isStress || isHR)
             ? item.percentage < 0
             : item.percentage > 0;
-        final color = isPositive ? _green : const Color(0xFFEF5350);
+
+        final color = isPositive ? AppTheme.green : AppTheme.red;
         final arrow = item.percentage > 0 ? '↑' : '↓';
 
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: _bgCard,
+            color: AppTheme.bgCard,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: color.withOpacity(0.2)),
           ),
@@ -117,9 +109,9 @@ class InsightsPage extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: _bgCard,
+        color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _accent.withOpacity(0.2)),
+        border: Border.all(color: AppTheme.accent.withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,16 +121,20 @@ class InsightsPage extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: _accent.withOpacity(0.12),
+                  color: AppTheme.accent.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.auto_awesome, color: _accent, size: 18),
+                child: const Icon(
+                  Icons.auto_awesome,
+                  color: AppTheme.accent,
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 10),
               const Text(
                 'AI Summary',
                 style: TextStyle(
-                  color: _accent,
+                  color: AppTheme.accent,
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
                 ),

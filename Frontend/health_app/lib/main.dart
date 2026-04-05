@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:health_app/home_page.dart';
-import 'package:health_app/login_page.dart'; // <-- Replaced animation import with this
+import 'package:health_app/login_page.dart';
 import 'services/health_database_service.dart';
+import 'core/theme/app_theme.dart'; // ⚡ NEW: Centralized theme import
 
 void main() {
   // Required for background initialization
@@ -15,7 +16,6 @@ class MyApp extends StatelessWidget {
 
   Future<Map<String, String?>> _initializeApp() async {
     const storage = FlutterSecureStorage();
-
     try {
       // Initializing the encrypted database
       // This retrieves/generates the key and opens the DB
@@ -37,74 +37,27 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0D1B2A),
-        primaryColor: const Color(0xFF4DD0E1),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF4DD0E1),
-          secondary: Color(0xFF7E57C2),
-          tertiary: Color(0xFF5C6BC0),
-          surface: Color(0xFF152238),
-          onPrimary: Color(0xFF0D1B2A),
-          onSecondary: Colors.white,
-          onSurface: Colors.white,
-        ),
-        navigationBarTheme: NavigationBarThemeData(
-          backgroundColor: const Color(0xFF0D1B2A),
-          indicatorColor: const Color(0xFF4DD0E1).withOpacity(0.15),
-          iconTheme: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.selected)) {
-              return const IconThemeData(color: Color(0xFF4DD0E1));
-            }
-            return const IconThemeData(color: Colors.white38);
-          }),
-          labelTextStyle: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.selected)) {
-              return const TextStyle(
-                color: Color(0xFF4DD0E1),
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              );
-            }
-            return const TextStyle(color: Colors.white38, fontSize: 12);
-          }),
-        ),
-        textTheme: const TextTheme(
-          displayLarge: TextStyle(color: Colors.white),
-          bodyLarge: TextStyle(color: Colors.white70),
-          titleLarge: TextStyle(color: Colors.white),
-        ),
-        cardTheme: CardThemeData(
-          color: const Color(0xFF152238),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          elevation: 0,
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          foregroundColor: Colors.white,
-        ),
-        inputDecorationTheme: const InputDecorationTheme(
-          labelStyle: TextStyle(color: Colors.white54),
-          prefixIconColor: Colors.white38,
-          enabledBorder: UnderlineInputBorder(
-            borderSide: BorderSide(color: Colors.white12),
-          ),
-          focusedBorder: UnderlineInputBorder(
-            borderSide: BorderSide(color: Color(0xFF4DD0E1)),
-          ),
-        ),
-      ),
-      home: FutureBuilder(
+      // ⚡ OPTIMIZATION: Now using the centralized, scalable theme
+      theme: AppTheme.darkTheme,
+      home: FutureBuilder<Map<String, String?>>(
         future: _initializeApp(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
+            return Scaffold(
               body: Center(
-                child: CircularProgressIndicator(color: Color(0xFF4DD0E1)),
+                child: CircularProgressIndicator(color: AppTheme.accent),
+              ),
+            );
+          }
+
+          if (snapshot.hasError) {
+            return Scaffold(
+              body: Center(
+                child: Text(
+                  'Initialization Error\nPlease restart the app.',
+                  style: TextStyle(color: AppTheme.red),
+                  textAlign: TextAlign.center,
+                ),
               ),
             );
           }

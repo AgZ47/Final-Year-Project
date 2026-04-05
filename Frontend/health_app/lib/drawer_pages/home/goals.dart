@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/wellness_engine.dart';
 import '../../services/health_database_service.dart';
 import '../../widgets/wellness_widgets.dart';
+import '../../core/theme/app_theme.dart'; // ⚡ NEW: Centralized theme
 
 class GoalsPage extends StatefulWidget {
   const GoalsPage({super.key});
@@ -11,9 +12,6 @@ class GoalsPage extends StatefulWidget {
 }
 
 class _GoalsPageState extends State<GoalsPage> {
-  static const _accent = Color(0xFF4DD0E1);
-  static const _green = Color(0xFF66BB6A);
-
   List<Map<String, dynamic>> _goals = [];
   bool _isLoading = true;
 
@@ -31,6 +29,7 @@ class _GoalsPageState extends State<GoalsPage> {
       final initialGoals = WellnessEngine.generateGoals(
         WellnessEngine.currentMetrics,
       );
+
       for (var goal in initialGoals) {
         await HealthDatabaseService.instance.insertRecord('goals', {
           'title': goal.title,
@@ -40,13 +39,19 @@ class _GoalsPageState extends State<GoalsPage> {
           'is_accepted': goal.accepted ? 1 : 0,
         });
       }
+
       // Re-fetch to get IDs
       final newGoals = await HealthDatabaseService.instance.getGoals();
+
+      if (!mounted) return; // ⚡ OPTIMIZATION: Prevent crash after async gap
+
       setState(() {
         _goals = newGoals.map((e) => Map<String, dynamic>.from(e)).toList();
         _isLoading = false;
       });
     } else {
+      if (!mounted) return;
+
       setState(() {
         _goals = dbGoals.map((e) => Map<String, dynamic>.from(e)).toList();
         _isLoading = false;
@@ -59,6 +64,7 @@ class _GoalsPageState extends State<GoalsPage> {
   double get _avgProgress {
     final accepted = _goals.where((g) => g['is_accepted'] == 1).toList();
     if (accepted.isEmpty) return 0;
+
     return accepted
             .map((g) => (g['progress'] as num).toDouble())
             .reduce((a, b) => a + b) /
@@ -68,6 +74,9 @@ class _GoalsPageState extends State<GoalsPage> {
   Future<void> _acceptGoal(int index) async {
     final id = _goals[index]['id'] as int;
     await HealthDatabaseService.instance.acceptGoal(id);
+
+    if (!mounted) return; // ⚡ OPTIMIZATION: Safe state update
+
     setState(() {
       _goals[index]['is_accepted'] = 1;
     });
@@ -76,6 +85,9 @@ class _GoalsPageState extends State<GoalsPage> {
   Future<void> _skipGoal(int index) async {
     final id = _goals[index]['id'] as int;
     await HealthDatabaseService.instance.deleteRecord('goals', id);
+
+    if (!mounted) return; // ⚡ OPTIMIZATION: Safe state update
+
     setState(() {
       _goals.removeAt(index);
     });
@@ -84,86 +96,86 @@ class _GoalsPageState extends State<GoalsPage> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: _accent));
+      return Container(
+        color: AppTheme.bgDark,
+        child: const Center(
+          child: CircularProgressIndicator(color: AppTheme.accent),
+        ),
+      );
     }
 
     final acceptedGoals = _goals.asMap().entries.where(
       (e) => e.value['is_accepted'] == 1,
     );
+
     final suggestedGoals = _goals.asMap().entries.where(
       (e) => e.value['is_accepted'] == 0,
     );
 
     return Container(
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF0B1527), Color(0xFF0D1B2A), Color(0xFF132E4A)],
-        ),
+        gradient: AppTheme.mainBackgroundGradient, // ⚡ Centralized Theme
       ),
       child: SafeArea(
-        child: SingleChildScrollView(
+        // ⚡ OPTIMIZATION: Converted to ListView
+        child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Smart Goals',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
+          children: [
+            const Text(
+              'Smart Goals',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'AI-suggested goals for you',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.5),
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            _buildOverallProgress(),
+            const SizedBox(height: 24),
+
+            _sectionTitle('Active Goals'),
+            const SizedBox(height: 12),
+            ...acceptedGoals.map(
+              (entry) => GoalProgressCard(
+                goal: SmartGoal(
+                  title: entry.value['title'],
+                  description: entry.value['description'],
+                  progress: (entry.value['progress'] as num).toDouble(),
+                  category: entry.value['category'],
+                  accepted: true,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                'AI-suggested goals for you',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
-                  fontSize: 15,
-                ),
-              ),
-              const SizedBox(height: 24),
+            ),
 
-              _buildOverallProgress(),
+            if (suggestedGoals.isNotEmpty) ...[
               const SizedBox(height: 24),
-
-              _sectionTitle('Active Goals'),
+              _sectionTitle('Suggested for You'),
               const SizedBox(height: 12),
-              ...acceptedGoals.map(
+              ...suggestedGoals.map(
                 (entry) => GoalProgressCard(
                   goal: SmartGoal(
                     title: entry.value['title'],
                     description: entry.value['description'],
                     progress: (entry.value['progress'] as num).toDouble(),
                     category: entry.value['category'],
-                    accepted: true,
+                    accepted: false,
                   ),
+                  onAccept: () => _acceptGoal(entry.key),
+                  onSkip: () => _skipGoal(entry.key),
                 ),
               ),
-
-              if (suggestedGoals.isNotEmpty) ...[
-                const SizedBox(height: 24),
-                _sectionTitle('Suggested for You'),
-                const SizedBox(height: 12),
-                ...suggestedGoals.map(
-                  (entry) => GoalProgressCard(
-                    goal: SmartGoal(
-                      title: entry.value['title'],
-                      description: entry.value['description'],
-                      progress: (entry.value['progress'] as num).toDouble(),
-                      category: entry.value['category'],
-                      accepted: false,
-                    ),
-                    onAccept: () => _acceptGoal(entry.key),
-                    onSkip: () => _skipGoal(entry.key),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 32),
             ],
-          ),
+            const SizedBox(height: 32),
+          ],
         ),
       ),
     );
@@ -175,12 +187,15 @@ class _GoalsPageState extends State<GoalsPage> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [_green.withOpacity(0.1), _accent.withOpacity(0.08)],
+          colors: [
+            AppTheme.green.withOpacity(0.1),
+            AppTheme.accent.withOpacity(0.08),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _green.withOpacity(0.2)),
+        border: Border.all(color: AppTheme.green.withOpacity(0.2)),
       ),
       child: Column(
         children: [
@@ -198,7 +213,7 @@ class _GoalsPageState extends State<GoalsPage> {
             child: LinearProgressIndicator(
               value: _avgProgress,
               backgroundColor: Colors.white.withOpacity(0.06),
-              valueColor: AlwaysStoppedAnimation(_green),
+              valueColor: const AlwaysStoppedAnimation(AppTheme.green),
               minHeight: 8,
             ),
           ),

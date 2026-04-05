@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
 import '../../services/wellness_engine.dart';
+import '../../core/theme/app_theme.dart'; // ⚡ NEW: Centralized theme
 
 class TimelinePage extends StatelessWidget {
   const TimelinePage({super.key});
 
-  static const _bgCard = Color(0xFF152238);
-  static const _accent = Color(0xFF4DD0E1);
-
+  // ⚡ OPTIMIZATION: Mapped backend hex strings to centralized theme colors
   static final _colorMap = {
-    '#FFD54F': const Color(0xFFFFD54F),
-    '#4DD0E1': const Color(0xFF4DD0E1),
-    '#EF5350': const Color(0xFFEF5350),
-    '#7E57C2': const Color(0xFF7E57C2),
-    '#66BB6A': const Color(0xFF66BB6A),
-    '#42A5F5': const Color(0xFF42A5F5),
+    '#FFD54F': AppTheme.gold,
+    '#4DD0E1': AppTheme.accent,
+    '#EF5350': AppTheme.red,
+    '#7E57C2': AppTheme.purple,
+    '#66BB6A': AppTheme.green,
+    '#42A5F5': AppTheme.indigo, // Assuming blue maps to indigo visually here
   };
 
   static final _iconMap = {
@@ -32,43 +31,41 @@ class TimelinePage extends StatelessWidget {
 
     return Container(
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF0B1527), Color(0xFF0D1B2A), Color(0xFF132E4A)],
-        ),
+        gradient: AppTheme.mainBackgroundGradient, // ⚡ Centralized Theme
       ),
       child: SafeArea(
-        child: SingleChildScrollView(
+        // ⚡ OPTIMIZATION: Converted to ListView for lazy rendering of timeline items
+        child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Health Timeline',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
+          children: [
+            const Text(
+              'Health Timeline',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Your daily health history',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
-                  fontSize: 15,
-                ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Your daily health history',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.5),
+                fontSize: 15,
               ),
-              const SizedBox(height: 8),
-              // Date label
-              Container(
+            ),
+            const SizedBox(height: 8),
+
+            // Date label
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 14,
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: _accent.withOpacity(0.1),
+                  color: AppTheme.accent.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
@@ -76,14 +73,14 @@ class TimelinePage extends StatelessWidget {
                   children: [
                     const Icon(
                       Icons.calendar_today_rounded,
-                      color: _accent,
+                      color: AppTheme.accent,
                       size: 14,
                     ),
                     const SizedBox(width: 6),
                     Text(
                       'Today',
                       style: TextStyle(
-                        color: _accent.withOpacity(0.9),
+                        color: AppTheme.accent.withOpacity(0.9),
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -91,19 +88,21 @@ class TimelinePage extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+            ),
+            const SizedBox(height: 24),
 
-              // ── Timeline entries ──
-              ...List.generate(entries.length, (i) {
-                final entry = entries[i];
-                final color = _colorMap[entry.color] ?? _accent;
-                final icon = _iconMap[entry.iconName] ?? Icons.circle;
-                final isLast = i == entries.length - 1;
-                return _buildTimelineItem(entry, color, icon, isLast);
-              }),
-              const SizedBox(height: 32),
-            ],
-          ),
+            // ── Timeline entries ──
+            ...List.generate(entries.length, (i) {
+              final entry = entries[i];
+              final color = _colorMap[entry.color] ?? AppTheme.accent;
+              final icon = _iconMap[entry.iconName] ?? Icons.circle;
+              final isLast = i == entries.length - 1;
+
+              return _buildTimelineItem(entry, color, icon, isLast);
+            }),
+
+            const SizedBox(height: 32),
+          ],
         ),
       ),
     );
@@ -152,7 +151,7 @@ class TimelinePage extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 16),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: _bgCard,
+                color: AppTheme.bgCard,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: color.withOpacity(0.15)),
               ),

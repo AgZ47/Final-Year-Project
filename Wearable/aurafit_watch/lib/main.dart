@@ -7,6 +7,16 @@ void main() {
   runApp(const AuraFitWatchApp());
 }
 
+// ⚡ OPTIMIZATION: Centralized Watch Palette
+class _WatchColors {
+  static const Color bgDark = Colors.black;
+  static const Color accent = Color(0xFF4DD0E1);
+  static const Color purple = Color(0xFF7E57C2);
+  static const Color indigo = Color(0xFF5C6BC0);
+  static const Color green = Color(0xFF66BB6A);
+  static const Color surface = Color(0xFF152238);
+}
+
 class AuraFitWatchApp extends StatefulWidget {
   const AuraFitWatchApp({super.key});
 
@@ -21,6 +31,7 @@ class _AuraFitWatchAppState extends State<AuraFitWatchApp> {
   @override
   void initState() {
     super.initState();
+    // Simulate heart rate sensor reading every 2 seconds
     _heartRateTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
       final mockBpm = 60 + Random().nextInt(40); // 60 - 100 bpm
       _watch.sendMessage({'bpm': mockBpm});
@@ -39,12 +50,11 @@ class _AuraFitWatchAppState extends State<AuraFitWatchApp> {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: Colors.black,
+        scaffoldBackgroundColor: _WatchColors.bgDark,
       ),
       home: Scaffold(
         body: LayoutBuilder(
           builder: (context, constraints) {
-            // ⚡ Responsive breakpoints
             final isSmall = constraints.maxWidth < 180;
             final iconSize = isSmall ? 24.0 : 32.0;
             final titleSize = isSmall ? 14.0 : 16.0;
@@ -58,7 +68,7 @@ class _AuraFitWatchAppState extends State<AuraFitWatchApp> {
                   children: [
                     Icon(
                       Icons.health_and_safety,
-                      color: const Color(0xFF4DD0E1),
+                      color: _WatchColors.accent,
                       size: iconSize,
                     ),
                     SizedBox(height: isSmall ? 4 : 8),
@@ -75,15 +85,16 @@ class _AuraFitWatchAppState extends State<AuraFitWatchApp> {
                     _MenuButton(
                       icon: Icons.psychology,
                       label: 'GHQ Survey',
-                      color: Colors.deepPurpleAccent,
+                      color: _WatchColors.purple,
                       targetScreen: const GHQScreen(),
                       isSmall: isSmall,
                     ),
                     SizedBox(height: isSmall ? 6 : 10),
+
                     _MenuButton(
                       icon: Icons.mood,
                       label: 'MDQ Survey',
-                      color: const Color(0xFF5C6BC0),
+                      color: _WatchColors.indigo,
                       targetScreen: const MDQScreen(),
                       isSmall: isSmall,
                     ),
@@ -92,15 +103,16 @@ class _AuraFitWatchAppState extends State<AuraFitWatchApp> {
                     _MenuButton(
                       icon: Icons.directions_walk,
                       label: 'Activity',
-                      color: const Color(0xFF4DD0E1),
+                      color: _WatchColors.accent,
                       targetScreen: const ActivityWatchScreen(),
                       isSmall: isSmall,
                     ),
                     SizedBox(height: isSmall ? 6 : 10),
+
                     _MenuButton(
                       icon: Icons.bedtime,
                       label: 'Sleep',
-                      color: const Color(0xFF7E57C2),
+                      color: _WatchColors.purple, // Using purple for sleep
                       targetScreen: const SleepWatchScreen(),
                       isSmall: isSmall,
                     ),
@@ -137,14 +149,12 @@ class _MenuButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: color.withOpacity(0.2),
           foregroundColor: color,
-          minimumSize: Size(
-            double.infinity,
-            isSmall ? 36 : 48,
-          ), // Dynamic height
+          minimumSize: Size(double.infinity, isSmall ? 36 : 48),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
           padding: EdgeInsets.symmetric(horizontal: isSmall ? 8 : 16),
+          elevation: 0,
         ),
         onPressed: () {
           Navigator.push(
@@ -176,6 +186,7 @@ class _MenuButton extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════
 class GHQScreen extends StatefulWidget {
   const GHQScreen({super.key});
+
   @override
   State<GHQScreen> createState() => _GHQScreenState();
 }
@@ -212,16 +223,19 @@ class _GHQScreenState extends State<GHQScreen> {
 
     if (_currentQuestionIndex >= _questions.length) {
       _watch.sendMessage({'action': 'sync_ghq', 'score': _totalScore});
+
       Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) Navigator.pop(context);
+        if (!mounted) return; // ⚡ OPTIMIZATION: Prevent crash on quick exit
+        Navigator.pop(context);
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_currentQuestionIndex >= _questions.length)
+    if (_currentQuestionIndex >= _questions.length) {
       return const _SuccessScreen(message: 'Score Sent!');
+    }
 
     final currentQ = _questions[_currentQuestionIndex];
     final options = currentQ['options'] as List<String>;
@@ -257,8 +271,9 @@ class _GHQScreenState extends State<GHQScreen> {
                   padding: const EdgeInsets.only(bottom: 6.0),
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF152238),
+                      backgroundColor: _WatchColors.surface,
                       minimumSize: Size(double.infinity, isSmall ? 32 : 44),
+                      elevation: 0,
                     ),
                     onPressed: () => _answerQuestion(index),
                     child: Text(
@@ -284,6 +299,7 @@ class _GHQScreenState extends State<GHQScreen> {
 // ═══════════════════════════════════════════════════════════════════════════
 class MDQScreen extends StatefulWidget {
   const MDQScreen({super.key});
+
   @override
   State<MDQScreen> createState() => _MDQScreenState();
 }
@@ -309,16 +325,20 @@ class _MDQScreenState extends State<MDQScreen> {
 
     if (_currentQuestionIndex >= _questions.length) {
       _watch.sendMessage({'action': 'sync_mdq', 'score': _totalScore});
+
       Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) Navigator.pop(context);
+        if (!mounted) return; // ⚡ OPTIMIZATION: Prevent crash on quick exit
+        Navigator.pop(context);
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_currentQuestionIndex >= _questions.length)
+    if (_currentQuestionIndex >= _questions.length) {
       return const _SuccessScreen(message: 'MDQ Sent!');
+    }
+
     final isSmall = MediaQuery.of(context).size.width < 180;
 
     return Scaffold(
@@ -354,6 +374,7 @@ class _MDQScreenState extends State<MDQScreen> {
                         backgroundColor: Colors.redAccent.withOpacity(0.2),
                         foregroundColor: Colors.redAccent,
                         minimumSize: Size(double.infinity, isSmall ? 36 : 48),
+                        elevation: 0,
                       ),
                       onPressed: () => _answerQuestion(false),
                       child: Text(
@@ -366,9 +387,10 @@ class _MDQScreenState extends State<MDQScreen> {
                   Expanded(
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green.withOpacity(0.2),
-                        foregroundColor: Colors.green,
+                        backgroundColor: _WatchColors.green.withOpacity(0.2),
+                        foregroundColor: _WatchColors.green,
                         minimumSize: Size(double.infinity, isSmall ? 36 : 48),
+                        elevation: 0,
                       ),
                       onPressed: () => _answerQuestion(true),
                       child: Text(
@@ -406,6 +428,7 @@ class ActivityWatchScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text('Activity', style: TextStyle(fontSize: isSmall ? 12 : 14)),
         backgroundColor: Colors.transparent,
+        elevation: 0,
         centerTitle: true,
       ),
       body: Center(
@@ -414,7 +437,7 @@ class ActivityWatchScreen extends StatelessWidget {
           children: [
             Icon(
               Icons.directions_walk,
-              color: const Color(0xFF4DD0E1),
+              color: _WatchColors.accent,
               size: isSmall ? 30 : 40,
             ),
             SizedBox(height: isSmall ? 4 : 8),
@@ -436,9 +459,12 @@ class ActivityWatchScreen extends StatelessWidget {
             SizedBox(height: isSmall ? 8 : 16),
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4DD0E1),
+                backgroundColor: _WatchColors.accent,
                 foregroundColor: Colors.black,
                 minimumSize: Size(isSmall ? 100 : 120, isSmall ? 36 : 40),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
               ),
               onPressed: () {
                 watch.sendMessage({
@@ -485,6 +511,7 @@ class SleepWatchScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text('Sleep', style: TextStyle(fontSize: isSmall ? 12 : 14)),
         backgroundColor: Colors.transparent,
+        elevation: 0,
         centerTitle: true,
       ),
       body: Center(
@@ -493,7 +520,7 @@ class SleepWatchScreen extends StatelessWidget {
           children: [
             Icon(
               Icons.bedtime,
-              color: const Color(0xFF7E57C2),
+              color: _WatchColors.purple,
               size: isSmall ? 30 : 40,
             ),
             SizedBox(height: isSmall ? 4 : 8),
@@ -515,9 +542,12 @@ class SleepWatchScreen extends StatelessWidget {
             SizedBox(height: isSmall ? 8 : 16),
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF7E57C2),
+                backgroundColor: _WatchColors.purple,
                 foregroundColor: Colors.white,
                 minimumSize: Size(isSmall ? 100 : 120, isSmall ? 36 : 40),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
               ),
               onPressed: () {
                 watch.sendMessage({
@@ -556,7 +586,7 @@ class _SuccessScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 40),
+            Icon(Icons.check_circle, color: _WatchColors.green, size: 40),
             const SizedBox(height: 10),
             Text(
               message,

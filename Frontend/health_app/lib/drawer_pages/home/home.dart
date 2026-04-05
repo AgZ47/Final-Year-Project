@@ -7,6 +7,7 @@ import '../../services/wellness_engine.dart';
 import '../../widgets/wellness_widgets.dart';
 import '../../services/watch_service.dart';
 import '../../services/health_database_service.dart';
+import '../../core/theme/app_theme.dart'; // ⚡ NEW: Centralized theme
 
 class _ActivityItemData {
   final IconData icon;
@@ -40,19 +41,11 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
   final _storage = const FlutterSecureStorage();
-  String _receivedText = "Waiting for watch...";
-  Color _watchColor = const Color(0xFF0D1B2A);
 
   // ── Checkbox states ──
   bool _waterChecked = false;
   bool _walkChecked = false;
   bool _sleepChecked = false;
-
-  // ── Colors ──
-  static const _bgCard = Color(0xFF152238);
-  static const _accent = Color(0xFF4DD0E1);
-  static const _purple = Color(0xFF7E57C2);
-  static const _green = Color(0xFF66BB6A);
 
   // ── Dynamic State ──
   WellnessMetrics? _metrics;
@@ -76,10 +69,8 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
   void initState() {
     super.initState();
     WatchService().initialize();
-    _checkDiagnostics();
-    WatchService().selectedColor.addListener(_onColorChanged);
 
-    // ⚡ NEW: Listen for background database updates from the watch!
+    // ⚡ Listen for background database updates from the watch
     WatchService().syncTrigger.addListener(_refreshAllData);
 
     _scoreAnimController = AnimationController(
@@ -95,7 +86,6 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
     _loadCheckboxStates();
   }
 
-  // ⚡ Helper to fetch everything again
   void _refreshAllData() {
     _loadDynamicData();
     _loadRecentActivities();
@@ -110,6 +100,7 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
       'mental_health_logs',
     );
     final now = DateTime.now();
+
     List<double> tempMood = List.filled(7, 0.0);
     List<int> moodCounts = List.filled(7, 0);
 
@@ -121,6 +112,7 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
         int dayIndex = logDate.weekday - 1; // 0=Mon, 6=Sun
         int rawMood = log['mood_score'] as int;
         double score = 1.0 - (rawMood / 4.0);
+
         tempMood[dayIndex] += score;
         moodCounts[dayIndex]++;
       }
@@ -162,7 +154,7 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
           icon: Icons.directions_walk_rounded,
           activity: 'Walked ${s['steps']} steps',
           timestamp: DateTime.parse(s['timestamp'] as String),
-          color: _accent,
+          color: AppTheme.accent,
         ),
       );
     }
@@ -179,7 +171,7 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
           icon: Icons.mood_rounded,
           activity: 'Logged mental health',
           timestamp: DateTime.parse(m['timestamp'] as String),
-          color: _purple,
+          color: AppTheme.purple,
         ),
       );
     }
@@ -196,17 +188,15 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
           icon: Icons.bedtime_rounded,
           activity: 'Logged sleep stats',
           timestamp: DateTime.parse(s['timestamp'] as String),
-          color: const Color(0xFF5C6BC0),
+          color: AppTheme.indigo,
         ),
       );
     }
 
-    // Sort all combined activities by the newest timestamp first
     activities.sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
     if (mounted) {
       setState(() {
-        // Take only the top 3 most recent actions overall
         _recentActivities = activities.take(3).toList();
         _isLoadingActivities = false;
       });
@@ -269,41 +259,9 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
 
   @override
   void dispose() {
-    WatchService().selectedColor.removeListener(_onColorChanged);
-    WatchService().syncTrigger.removeListener(
-      _refreshAllData,
-    ); // Don't forget to dispose!
+    WatchService().syncTrigger.removeListener(_refreshAllData);
     _scoreAnimController.dispose();
     super.dispose();
-  }
-
-  void _onColorChanged() {
-    final colorName = WatchService().selectedColor.value;
-    if (colorName.isNotEmpty && mounted) {
-      setState(() {
-        _receivedText = "Watch Selected: $colorName";
-        _watchColor = _getColorFromName(colorName);
-      });
-    }
-  }
-
-  void _checkDiagnostics() async {
-    final watch = WatchConnectivity();
-    bool isReachable = await watch.isReachable;
-    if (mounted) setState(() => _receivedText = "Reachable: $isReachable");
-  }
-
-  Color _getColorFromName(String name) {
-    switch (name.toLowerCase()) {
-      case 'red':
-        return Colors.red.shade100;
-      case 'green':
-        return Colors.green.shade100;
-      case 'blue':
-        return Colors.blue.shade100;
-      default:
-        return const Color(0xFF0D1B2A);
-    }
   }
 
   String _getHeartRateStatus(int bpm) {
@@ -317,119 +275,127 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
   Widget build(BuildContext context) {
     if (_isLoadingData) {
       return Container(
-        color: const Color(0xFF0D1B2A),
-        child: const Center(child: CircularProgressIndicator(color: _accent)),
+        color: AppTheme.bgDark,
+        child: const Center(
+          child: CircularProgressIndicator(color: AppTheme.accent),
+        ),
       );
     }
 
+    // ⚡ OPTIMIZATION: Switched to ListView for lazy rendering of large dynamic content
     return Container(
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF0B1527), Color(0xFF0D1B2A), Color(0xFF132E4A)],
-        ),
+        gradient: AppTheme.mainBackgroundGradient, // Using centralized theme
       ),
       child: SafeArea(
-        child: SingleChildScrollView(
+        child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildGreeting(),
-              const SizedBox(height: 16),
-              if (_notifications.isNotEmpty) _buildNotificationBanner(),
-              if (_notifications.isNotEmpty) const SizedBox(height: 20),
+          children: [
+            _buildGreeting(),
+            const SizedBox(height: 16),
 
-              AnimatedBuilder(
-                animation: _scoreAnim,
-                builder: (_, __) => WellnessScoreCard(
-                  score: _wellnessScore,
-                  trend: WellnessEngine.getScoreTrend(),
-                  animationValue: _scoreAnim.value,
-                ),
-              ),
-              const SizedBox(height: 16),
-              RecoveryScoreCard(score: _recoveryScore, status: _recoveryStatus),
+            if (_notifications.isNotEmpty) ...[
+              _buildNotificationBanner(),
               const SizedBox(height: 20),
-
-              _buildQuickMetrics(),
-
-              const SizedBox(height: 24),
-              if (_alerts.isNotEmpty) ...[
-                _buildSectionTitle('Health Alerts'),
-                const SizedBox(height: 12),
-                ..._alerts.map((a) => HealthAlertCard(alert: a)),
-                const SizedBox(height: 20),
-              ],
-
-              _buildSectionTitle('Recommended for You'),
-              const SizedBox(height: 12),
-              _buildRecommendations(),
-              const SizedBox(height: 24),
-
-              _buildAIInsight(),
-              const SizedBox(height: 24),
-              _buildSectionTitle('Quick Actions'),
-              const SizedBox(height: 14),
-              _buildQuickActions(),
-              const SizedBox(height: 24),
-              _buildSectionTitle('Daily Self Care'),
-              const SizedBox(height: 14),
-              _buildSelfCare(),
-              const SizedBox(height: 24),
-              _buildSectionTitle('Support'),
-              const SizedBox(height: 14),
-              _buildSupportCard(),
-              const SizedBox(height: 24),
-              _buildBreathingShortcut(),
-              const SizedBox(height: 24),
-              _buildSectionTitle('Upcoming'),
-              const SizedBox(height: 14),
-              _buildAppointmentCard(
-                title: 'Dr. Sarah Wilson',
-                subtitle: 'Cardiologist',
-                date: 'Tomorrow, 10:30 AM',
-                icon: Icons.favorite_rounded,
-                color: Colors.redAccent,
-              ),
-              const SizedBox(height: 12),
-              _buildAppointmentCard(
-                title: 'Dr. Michael Chen',
-                subtitle: 'General Checkup',
-                date: 'Mar 8, 3:30 PM',
-                icon: Icons.local_hospital_rounded,
-                color: _purple,
-              ),
-              const SizedBox(height: 24),
-              _buildSectionTitle('Weekly Mood'),
-              const SizedBox(height: 14),
-              _buildWeeklyMood(),
-              const SizedBox(height: 24),
-
-              _buildSectionTitle('Recent Activity'),
-              const SizedBox(height: 14),
-
-              if (_isLoadingActivities)
-                const Center(child: CircularProgressIndicator(color: _accent))
-              else if (_recentActivities.isEmpty)
-                Text(
-                  'No recent activity yet. Go log something!',
-                  style: TextStyle(color: Colors.white.withOpacity(0.5)),
-                )
-              else
-                ..._recentActivities.map(
-                  (a) => _buildActivityItem(
-                    icon: a.icon,
-                    activity: a.activity,
-                    time: _formatTimeAgo(a.timestamp),
-                    color: a.color,
-                  ),
-                ),
-
-              const SizedBox(height: 40),
             ],
-          ),
+
+            AnimatedBuilder(
+              animation: _scoreAnim,
+              builder: (_, __) => WellnessScoreCard(
+                score: _wellnessScore,
+                trend: WellnessEngine.getScoreTrend(),
+                animationValue: _scoreAnim.value,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            RecoveryScoreCard(score: _recoveryScore, status: _recoveryStatus),
+            const SizedBox(height: 20),
+
+            _buildQuickMetrics(),
+            const SizedBox(height: 24),
+
+            if (_alerts.isNotEmpty) ...[
+              _buildSectionTitle('Health Alerts'),
+              const SizedBox(height: 12),
+              ..._alerts.map((a) => HealthAlertCard(alert: a)),
+              const SizedBox(height: 20),
+            ],
+
+            _buildSectionTitle('Recommended for You'),
+            const SizedBox(height: 12),
+            _buildRecommendations(),
+            const SizedBox(height: 24),
+
+            _buildAIInsight(),
+            const SizedBox(height: 24),
+
+            _buildSectionTitle('Quick Actions'),
+            const SizedBox(height: 14),
+            _buildQuickActions(),
+            const SizedBox(height: 24),
+
+            _buildSectionTitle('Daily Self Care'),
+            const SizedBox(height: 14),
+            _buildSelfCare(),
+            const SizedBox(height: 24),
+
+            _buildSectionTitle('Support'),
+            const SizedBox(height: 14),
+            _buildSupportCard(),
+            const SizedBox(height: 24),
+
+            _buildBreathingShortcut(),
+            const SizedBox(height: 24),
+
+            _buildSectionTitle('Upcoming'),
+            const SizedBox(height: 14),
+            _buildAppointmentCard(
+              title: 'Dr. Sarah Wilson',
+              subtitle: 'Cardiologist',
+              date: 'Tomorrow, 10:30 AM',
+              icon: Icons.favorite_rounded,
+              color: Colors.redAccent,
+            ),
+            const SizedBox(height: 12),
+            _buildAppointmentCard(
+              title: 'Dr. Michael Chen',
+              subtitle: 'General Checkup',
+              date: 'Mar 8, 3:30 PM',
+              icon: Icons.local_hospital_rounded,
+              color: AppTheme.purple,
+            ),
+            const SizedBox(height: 24),
+
+            _buildSectionTitle('Weekly Mood'),
+            const SizedBox(height: 14),
+            _buildWeeklyMood(),
+            const SizedBox(height: 24),
+
+            _buildSectionTitle('Recent Activity'),
+            const SizedBox(height: 14),
+
+            if (_isLoadingActivities)
+              const Center(
+                child: CircularProgressIndicator(color: AppTheme.accent),
+              )
+            else if (_recentActivities.isEmpty)
+              Text(
+                'No recent activity yet. Go log something!',
+                style: TextStyle(color: Colors.white.withOpacity(0.5)),
+              )
+            else
+              ..._recentActivities.map(
+                (a) => _buildActivityItem(
+                  icon: a.icon,
+                  activity: a.activity,
+                  time: _formatTimeAgo(a.timestamp),
+                  color: a.color,
+                ),
+              ),
+
+            const SizedBox(height: 40),
+          ],
         ),
       ),
     );
@@ -444,7 +410,7 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
             label: 'Mental',
             value: '${(_metrics!.moodScore * 100).round()}',
             sub: _metrics!.moodScore > 0.6 ? 'Stable' : 'Needs Care',
-            color: _purple,
+            color: AppTheme.purple,
           ),
         ),
         const SizedBox(width: 10),
@@ -454,7 +420,7 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
             label: 'Activity',
             value: '${(_metrics!.activityLevel * 100).round()}%',
             sub: _metrics!.activityLevel > 0.5 ? 'Active' : 'Low',
-            color: const Color(0xFF5C6BC0),
+            color: AppTheme.indigo,
           ),
         ),
         const SizedBox(width: 10),
@@ -503,6 +469,7 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
     ];
     final dateStr =
         '${days[now.weekday - 1]}, ${months[now.month - 1]} ${now.day}';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -532,9 +499,9 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: _purple.withOpacity(0.12),
+        color: AppTheme.purple.withOpacity(0.12),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _purple.withOpacity(0.2)),
+        border: Border.all(color: AppTheme.purple.withOpacity(0.2)),
       ),
       child: Column(
         children: _notifications
@@ -545,7 +512,7 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
                   children: [
                     const Icon(
                       Icons.notifications_active_rounded,
-                      color: _purple,
+                      color: AppTheme.purple,
                       size: 16,
                     ),
                     const SizedBox(width: 10),
@@ -575,21 +542,24 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
       'favorite': Icons.favorite_rounded,
       'water_drop': Icons.water_drop_rounded,
     };
+
     final colorMap = {
-      'activity': _green,
-      'mental': _purple,
-      'sleep': const Color(0xFF5C6BC0),
-      'nutrition': _accent,
+      'activity': AppTheme.green,
+      'mental': AppTheme.purple,
+      'sleep': AppTheme.indigo,
+      'nutrition': AppTheme.accent,
     };
+
     return Column(
       children: _recommendations.map((r) {
-        final color = colorMap[r.category] ?? _accent;
+        final color = colorMap[r.category] ?? AppTheme.accent;
         final icon = iconMap[r.iconName] ?? Icons.lightbulb_rounded;
+
         return Container(
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: _bgCard,
+            color: AppTheme.bgCard,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: color.withOpacity(0.15)),
           ),
@@ -644,7 +614,7 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
       decoration: BoxDecoration(
-        color: _bgCard,
+        color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withOpacity(0.15)),
       ),
@@ -678,9 +648,9 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: _bgCard,
+        color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _accent.withOpacity(0.2)),
+        border: Border.all(color: AppTheme.accent.withOpacity(0.2)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -688,12 +658,12 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: _accent.withOpacity(0.12),
+              color: AppTheme.accent.withOpacity(0.12),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(
               Icons.lightbulb_rounded,
-              color: _accent,
+              color: AppTheme.accent,
               size: 22,
             ),
           ),
@@ -705,7 +675,7 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
                 const Text(
                   'AI Insight',
                   style: TextStyle(
-                    color: _accent,
+                    color: AppTheme.accent,
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                   ),
@@ -732,19 +702,19 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
       {
         'icon': Icons.mood_rounded,
         'label': 'Log Mood',
-        'color': _purple,
+        'color': AppTheme.purple,
         'targetIndex': 3,
       },
       {
         'icon': Icons.air_rounded,
         'label': 'Breathing',
-        'color': _green,
+        'color': AppTheme.green,
         'targetIndex': -1,
       },
       {
         'icon': Icons.bedtime_rounded,
         'label': 'Sleep Stats',
-        'color': const Color(0xFF5C6BC0),
+        'color': AppTheme.indigo,
         'targetIndex': 1,
       },
       {
@@ -817,7 +787,7 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: _bgCard,
+        color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white10),
       ),
@@ -825,7 +795,7 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
         children: [
           const CircleAvatar(
             radius: 26,
-            backgroundColor: _purple,
+            backgroundColor: AppTheme.purple,
             child: Icon(Icons.medical_services, color: Colors.white, size: 26),
           ),
           const SizedBox(width: 14),
@@ -861,10 +831,10 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
             icon: Container(
               padding: const EdgeInsets.all(8),
               decoration: const BoxDecoration(
-                color: _accent,
+                color: AppTheme.accent,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.call, color: Color(0xFF0D1B2A), size: 18),
+              child: const Icon(Icons.call, color: AppTheme.bgDark, size: 18),
             ),
           ),
         ],
@@ -880,14 +850,14 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [_purple, _purple.withOpacity(0.6)],
+            colors: [AppTheme.purple, AppTheme.purple.withOpacity(0.6)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: _purple.withOpacity(0.25),
+              color: AppTheme.purple.withOpacity(0.25),
               blurRadius: 14,
               offset: const Offset(0, 4),
             ),
@@ -938,7 +908,7 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: _bgCard,
+        color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white10),
       ),
@@ -957,17 +927,14 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: isToday
-                        ? [_accent, _accent.withOpacity(0.4)]
-                        : [
-                            const Color(0xFF5C6BC0),
-                            const Color(0xFF5C6BC0).withOpacity(0.3),
-                          ],
+                        ? [AppTheme.accent, AppTheme.accent.withOpacity(0.4)]
+                        : [AppTheme.indigo, AppTheme.indigo.withOpacity(0.3)],
                   ),
                   borderRadius: BorderRadius.circular(6),
                   boxShadow: isToday
                       ? [
                           BoxShadow(
-                            color: _accent.withOpacity(0.4),
+                            color: AppTheme.accent.withOpacity(0.4),
                             blurRadius: 6,
                           ),
                         ]
@@ -980,7 +947,7 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
-                  color: isToday ? _accent : Colors.white54,
+                  color: isToday ? AppTheme.accent : Colors.white54,
                 ),
               ),
             ],
@@ -1008,13 +975,13 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
   ) {
     return Card(
       elevation: 0,
-      color: _bgCard,
+      color: AppTheme.bgCard,
       margin: const EdgeInsets.only(bottom: 10),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: CheckboxListTile(
         tristate: false,
-        activeColor: _accent,
-        checkColor: const Color(0xFF0D1B2A),
+        activeColor: AppTheme.accent,
+        checkColor: AppTheme.bgDark,
         title: Text(
           title,
           style: TextStyle(
@@ -1041,7 +1008,7 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _bgCard,
+        color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: color.withOpacity(0.15)),
       ),

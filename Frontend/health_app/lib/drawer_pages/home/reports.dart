@@ -1,16 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../services/wellness_engine.dart';
 import '../../widgets/wellness_widgets.dart';
+import '../../core/theme/app_theme.dart'; // ⚡ NEW: Centralized theme
 
 class ReportsPage extends StatelessWidget {
   const ReportsPage({super.key});
-
-  // ── Colors ──
-  static const _bgCard = Color(0xFF152238);
-  static const _accent = Color(0xFF4DD0E1);
-  static const _purple = Color(0xFF7E57C2);
-  static const _indigo = Color(0xFF5C6BC0);
-  static const _green = Color(0xFF66BB6A);
 
   @override
   Widget build(BuildContext context) {
@@ -22,82 +16,76 @@ class ReportsPage extends StatelessWidget {
 
     return Container(
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF0B1527), Color(0xFF0D1B2A), Color(0xFF132E4A)],
-        ),
+        gradient: AppTheme.mainBackgroundGradient, // ⚡ Centralized Theme
       ),
       child: SafeArea(
-        child: SingleChildScrollView(
+        // ⚡ OPTIMIZATION: Converted to ListView
+        child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Weekly Report',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
+          children: [
+            const Text(
+              'Weekly Report',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Your wellness summary this week',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
-                  fontSize: 15,
-                ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Your wellness summary this week',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.5),
+                fontSize: 15,
               ),
-              const SizedBox(height: 24),
+            ),
+            const SizedBox(height: 24),
 
-              // ── Wellness Score ──
-              WellnessScoreCard(score: score, trend: trend),
-              const SizedBox(height: 20),
+            // ── Wellness Score ──
+            WellnessScoreCard(score: score, trend: trend),
+            const SizedBox(height: 20),
 
-              // ── Weekly Improvements ──
-              _sectionTitle('Weekly Improvements'),
-              const SizedBox(height: 12),
-              _buildImprovementChips(improvements),
-              const SizedBox(height: 24),
+            // ── Weekly Improvements ──
+            _sectionTitle('Weekly Improvements'),
+            const SizedBox(height: 12),
+            _buildImprovementChips(improvements),
+            const SizedBox(height: 24),
 
-              // ── Charts ──
-              ReportChartCard(
-                title: 'Mood Trend',
-                improvement: '10%',
-                isPositive: true,
-                data: const [0.6, 0.8, 0.5, 0.9, 0.7, 0.85, 0.65],
-                color: _purple,
-              ),
-              ReportChartCard(
-                title: 'Sleep Duration',
-                improvement: '12%',
-                isPositive: true,
-                data: const [0.7, 0.85, 0.6, 0.9, 0.55, 0.8, 0.75],
-                color: _indigo,
-              ),
-              ReportChartCard(
-                title: 'Heart Rate Avg',
-                improvement: '2 bpm',
-                isPositive: true,
-                data: const [0.72, 0.68, 0.75, 0.7, 0.65, 0.73, 0.71],
-                color: Colors.redAccent,
-              ),
-              ReportChartCard(
-                title: 'Activity Level',
-                improvement: '15%',
-                isPositive: true,
-                data: const [0.4, 0.5, 0.3, 0.6, 0.45, 0.7, 0.55],
-                color: _green,
-              ),
+            // ── Charts ──
+            ReportChartCard(
+              title: 'Mood Trend',
+              improvement: '10%',
+              isPositive: true,
+              data: const [0.6, 0.8, 0.5, 0.9, 0.7, 0.85, 0.65],
+              color: AppTheme.purple,
+            ),
+            ReportChartCard(
+              title: 'Sleep Duration',
+              improvement: '12%',
+              isPositive: true,
+              data: const [0.7, 0.85, 0.6, 0.9, 0.55, 0.8, 0.75],
+              color: AppTheme.indigo,
+            ),
+            ReportChartCard(
+              title: 'Heart Rate Avg',
+              improvement: '2 bpm',
+              isPositive: true,
+              data: const [0.72, 0.68, 0.75, 0.7, 0.65, 0.73, 0.71],
+              color: AppTheme.red,
+            ),
+            ReportChartCard(
+              title: 'Activity Level',
+              improvement: '15%',
+              isPositive: true,
+              data: const [0.4, 0.5, 0.3, 0.6, 0.45, 0.7, 0.55],
+              color: AppTheme.green,
+            ),
 
-              // ── AI Health Summary ──
-              const SizedBox(height: 8),
-              _buildAIHealthSummary(),
-              const SizedBox(height: 32),
-            ],
-          ),
+            // ── AI Health Summary ──
+            const SizedBox(height: 8),
+            _buildAIHealthSummary(),
+            const SizedBox(height: 32),
+          ],
         ),
       ),
     );
@@ -115,7 +103,8 @@ class ReportsPage extends StatelessWidget {
         final isPositive = (isStress || isHR)
             ? item.percentage < 0
             : item.percentage > 0;
-        final color = isPositive ? _green : const Color(0xFFEF5350);
+
+        final color = isPositive ? AppTheme.green : AppTheme.red;
         final arrow = item.percentage > 0 ? '↑' : '↓';
 
         return Container(
@@ -157,9 +146,9 @@ class ReportsPage extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: _bgCard,
+        color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _accent.withOpacity(0.25)),
+        border: Border.all(color: AppTheme.accent.withOpacity(0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -169,16 +158,20 @@ class ReportsPage extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: _accent.withOpacity(0.12),
+                  color: AppTheme.accent.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.auto_awesome, color: _accent, size: 20),
+                child: const Icon(
+                  Icons.auto_awesome,
+                  color: AppTheme.accent,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 10),
               const Text(
                 'AI Weekly Summary',
                 style: TextStyle(
-                  color: _accent,
+                  color: AppTheme.accent,
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
@@ -213,7 +206,7 @@ class ReportsPage extends StatelessWidget {
           width: 6,
           height: 6,
           decoration: BoxDecoration(
-            color: _accent.withOpacity(0.6),
+            color: AppTheme.accent.withOpacity(0.6),
             shape: BoxShape.circle,
           ),
         ),

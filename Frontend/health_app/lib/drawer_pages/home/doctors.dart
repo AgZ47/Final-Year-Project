@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'pdf_preview_page.dart'; // NEW IMPORT
+import 'pdf_preview_page.dart';
+import '../../core/theme/app_theme.dart'; // ⚡ NEW: Centralized theme
 
 class DoctorsPage extends StatefulWidget {
   const DoctorsPage({super.key});
@@ -10,12 +11,6 @@ class DoctorsPage extends StatefulWidget {
 }
 
 class _DoctorsPageState extends State<DoctorsPage> {
-  // ── Colors ──
-  static const _bgCard = Color(0xFF152238);
-  static const _accent = Color(0xFF4DD0E1);
-  static const _purple = Color(0xFF7E57C2);
-  static const _green = Color(0xFF66BB6A);
-
   // ── Sample doctors ──
   static final _doctors = [
     {
@@ -31,7 +26,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
       'specialty': 'General Physician',
       'rating': '4.9',
       'available': true,
-      'color': _accent,
+      'color': AppTheme.accent, // ⚡ Themed
       'icon': Icons.local_hospital_rounded,
     },
     {
@@ -39,7 +34,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
       'specialty': 'Psychiatrist',
       'rating': '4.9',
       'available': true,
-      'color': _purple,
+      'color': AppTheme.purple, // ⚡ Themed
       'icon': Icons.psychology_rounded,
     },
     {
@@ -47,7 +42,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
       'specialty': 'Nutritionist',
       'rating': '4.7',
       'available': false,
-      'color': _green,
+      'color': AppTheme.green, // ⚡ Themed
       'icon': Icons.restaurant_rounded,
     },
   ];
@@ -56,42 +51,36 @@ class _DoctorsPageState extends State<DoctorsPage> {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF0B1527), Color(0xFF0D1B2A), Color(0xFF132E4A)],
-        ),
+        gradient: AppTheme.mainBackgroundGradient, // ⚡ Centralized Theme
       ),
       child: SafeArea(
-        child: SingleChildScrollView(
+        // ⚡ OPTIMIZATION: Converted to ListView for directory scaling
+        child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Doctors',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
+          children: [
+            const Text(
+              'Doctors',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Find and book appointments',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
-                  fontSize: 15,
-                ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Find and book appointments',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.5),
+                fontSize: 15,
               ),
-              const SizedBox(height: 24),
+            ),
+            const SizedBox(height: 24),
 
-              // ── Doctor Cards ──
-              ..._doctors.map((doc) => _buildDoctorCard(doc)),
+            // ── Doctor Cards ──
+            ..._doctors.map((doc) => _buildDoctorCard(doc)),
 
-              const SizedBox(height: 32),
-            ],
-          ),
+            const SizedBox(height: 32),
+          ],
         ),
       ),
     );
@@ -105,7 +94,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: _bgCard,
+        color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withOpacity(0.15)),
       ),
@@ -150,7 +139,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
                     children: [
                       const Icon(
                         Icons.star_rounded,
-                        color: Color(0xFFFFD54F),
+                        color: AppTheme.gold,
                         size: 16,
                       ),
                       const SizedBox(width: 3),
@@ -172,14 +161,14 @@ class _DoctorsPageState extends State<DoctorsPage> {
                     ),
                     decoration: BoxDecoration(
                       color: available
-                          ? _green.withOpacity(0.12)
+                          ? AppTheme.green.withOpacity(0.12)
                           : Colors.white.withOpacity(0.05),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       available ? 'Available' : 'Unavailable',
                       style: TextStyle(
-                        color: available ? _green : Colors.white38,
+                        color: available ? AppTheme.green : Colors.white38,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
@@ -199,6 +188,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
                       SnackBar(
                         content: Text('Viewing profile of ${doc['name']}'),
                         behavior: SnackBarBehavior.floating,
+                        backgroundColor: AppTheme.bgCard,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -206,8 +196,8 @@ class _DoctorsPageState extends State<DoctorsPage> {
                     );
                   },
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: _accent,
-                    side: BorderSide(color: _accent.withOpacity(0.3)),
+                    foregroundColor: AppTheme.accent,
+                    side: BorderSide(color: AppTheme.accent.withOpacity(0.3)),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -224,8 +214,8 @@ class _DoctorsPageState extends State<DoctorsPage> {
                 child: ElevatedButton(
                   onPressed: available ? () => _showBookingSheet(doc) : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _accent,
-                    foregroundColor: const Color(0xFF0D1B2A),
+                    backgroundColor: AppTheme.accent,
+                    foregroundColor: AppTheme.bgDark,
                     disabledBackgroundColor: Colors.white10,
                     disabledForegroundColor: Colors.white24,
                     shape: RoundedRectangleBorder(
@@ -270,9 +260,6 @@ class _BookingSheet extends StatefulWidget {
 }
 
 class _BookingSheetState extends State<_BookingSheet> {
-  static const _bgCard = Color(0xFF152238);
-  static const _accent = Color(0xFF4DD0E1);
-
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   int _selectedSlot = -1;
 
@@ -289,7 +276,7 @@ class _BookingSheetState extends State<_BookingSheet> {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF0D1B2A),
+        color: AppTheme.bgDark,
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       padding: const EdgeInsets.all(24),
@@ -347,10 +334,10 @@ class _BookingSheetState extends State<_BookingSheet> {
                     duration: const Duration(milliseconds: 200),
                     width: 55,
                     decoration: BoxDecoration(
-                      color: isSelected ? _accent : _bgCard,
+                      color: isSelected ? AppTheme.accent : AppTheme.bgCard,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: isSelected ? _accent : Colors.white10,
+                        color: isSelected ? AppTheme.accent : Colors.white10,
                       ),
                     ),
                     child: Column(
@@ -360,7 +347,7 @@ class _BookingSheetState extends State<_BookingSheet> {
                           days[(date.weekday - 1) % 7],
                           style: TextStyle(
                             color: isSelected
-                                ? const Color(0xFF0D1B2A)
+                                ? AppTheme.bgDark
                                 : Colors.white54,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -370,9 +357,7 @@ class _BookingSheetState extends State<_BookingSheet> {
                         Text(
                           '${date.day}',
                           style: TextStyle(
-                            color: isSelected
-                                ? const Color(0xFF0D1B2A)
-                                : Colors.white,
+                            color: isSelected ? AppTheme.bgDark : Colors.white,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -410,18 +395,16 @@ class _BookingSheetState extends State<_BookingSheet> {
                     vertical: 12,
                   ),
                   decoration: BoxDecoration(
-                    color: isSelected ? _accent : _bgCard,
+                    color: isSelected ? AppTheme.accent : AppTheme.bgCard,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isSelected ? _accent : Colors.white10,
+                      color: isSelected ? AppTheme.accent : Colors.white10,
                     ),
                   ),
                   child: Text(
                     _timeSlots[i],
                     style: TextStyle(
-                      color: isSelected
-                          ? const Color(0xFF0D1B2A)
-                          : Colors.white70,
+                      color: isSelected ? AppTheme.bgDark : Colors.white70,
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                     ),
@@ -432,13 +415,12 @@ class _BookingSheetState extends State<_BookingSheet> {
           ),
           const SizedBox(height: 24),
 
-          // ⚡ NEW: Generate PDF and Show Preview
+          // Generate PDF and Show Preview
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: _selectedSlot >= 0
                   ? () async {
-                      // Fetch the locally saved user name
                       const storage = FlutterSecureStorage();
                       final pName =
                           await storage.read(key: 'username') ?? 'Patient';
@@ -449,7 +431,6 @@ class _BookingSheetState extends State<_BookingSheet> {
                       final dateStr =
                           '${_selectedDate.day}/${_selectedDate.month} at ${_timeSlots[_selectedSlot]}';
 
-                      // Push the PDF Preview page
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -463,8 +444,8 @@ class _BookingSheetState extends State<_BookingSheet> {
                     }
                   : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: _accent,
-                foregroundColor: const Color(0xFF0D1B2A),
+                backgroundColor: AppTheme.accent,
+                foregroundColor: AppTheme.bgDark,
                 disabledBackgroundColor: Colors.white10,
                 disabledForegroundColor: Colors.white24,
                 padding: const EdgeInsets.symmetric(vertical: 16),

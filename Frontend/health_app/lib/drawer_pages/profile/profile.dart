@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:math'; // Needed for calculating initials safely
 import '../../login_page.dart';
+import '../../core/theme/app_theme.dart'; // ⚡ NEW: Centralized theme
 
 class Profile extends StatefulWidget {
   const Profile({super.key});
@@ -13,13 +14,8 @@ class Profile extends StatefulWidget {
 class _ProfileState extends State<Profile> {
   final _storage = const FlutterSecureStorage();
 
-  // ── Colors ──
-  static const _bgCard = Color(0xFF152238);
-  static const _accent = Color(0xFF4DD0E1);
-  static const _purple = Color(0xFF7E57C2);
-
   // ── Toggle state ──
-  bool _darkMode = true; // Ignored for now as requested
+  bool _darkMode = true; // Visual only for now
   bool _notifications = true;
   bool _metricUnits = false;
 
@@ -54,14 +50,14 @@ class _ProfileState extends State<Profile> {
       }
     }
 
-    if (mounted) {
-      setState(() {
-        if (notifs != null) _notifications = notifs == 'true';
-        if (metrics != null) _metricUnits = metrics == 'true';
-        _username = savedName;
-        _initials = init;
-      });
-    }
+    if (!mounted) return; // ⚡ OPTIMIZATION: Safe async gap check
+
+    setState(() {
+      if (notifs != null) _notifications = notifs == 'true';
+      if (metrics != null) _metricUnits = metrics == 'true';
+      _username = savedName;
+      _initials = init;
+    });
   }
 
   // ==========================================
@@ -81,52 +77,46 @@ class _ProfileState extends State<Profile> {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF0B1527), Color(0xFF0D1B2A), Color(0xFF132E4A)],
-        ),
+        gradient: AppTheme.mainBackgroundGradient, // ⚡ Centralized Theme
       ),
       child: SafeArea(
-        child: SingleChildScrollView(
+        // ⚡ OPTIMIZATION: Converted to ListView
+        child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            children: [
-              const SizedBox(height: 8),
+          children: [
+            const SizedBox(height: 8),
 
-              // ── Avatar Section ──
-              _buildAvatarSection(),
-              const SizedBox(height: 32),
+            // ── Avatar Section ──
+            _buildAvatarSection(),
+            const SizedBox(height: 32),
 
-              // ── Personal Information ──
-              _buildSectionTitle('Personal Information'),
-              const SizedBox(height: 12),
-              _buildPersonalInfo(),
-              const SizedBox(height: 28),
+            // ── Personal Information ──
+            _buildSectionTitle('Personal Information'),
+            const SizedBox(height: 12),
+            _buildPersonalInfo(),
+            const SizedBox(height: 28),
 
-              // ── Preferences ──
-              _buildSectionTitle('Preferences'),
-              const SizedBox(height: 12),
-              _buildPreferences(),
-              const SizedBox(height: 28),
+            // ── Preferences ──
+            _buildSectionTitle('Preferences'),
+            const SizedBox(height: 12),
+            _buildPreferences(),
+            const SizedBox(height: 28),
 
-              // ── Settings ──
-              _buildSectionTitle('Settings'),
-              const SizedBox(height: 12),
-              _buildSettings(),
-              const SizedBox(height: 32),
+            // ── Settings ──
+            _buildSectionTitle('Settings'),
+            const SizedBox(height: 12),
+            _buildSettings(),
+            const SizedBox(height: 32),
 
-              // ── Logout ──
-              _buildLogoutButton(),
-              const SizedBox(height: 32),
-            ],
-          ),
+            // ── Logout ──
+            _buildLogoutButton(),
+            const SizedBox(height: 32),
+          ],
         ),
       ),
     );
   }
 
-  // ⚡ UPDATED: Now uses dynamic _initials and _username
   Widget _buildAvatarSection() {
     return Column(
       children: [
@@ -135,13 +125,13 @@ class _ProfileState extends State<Profile> {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: const LinearGradient(
-              colors: [_accent, _purple],
+              colors: [AppTheme.accent, AppTheme.purple],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             boxShadow: [
               BoxShadow(
-                color: _accent.withOpacity(0.3),
+                color: AppTheme.accent.withOpacity(0.3),
                 blurRadius: 20,
                 spreadRadius: 2,
               ),
@@ -149,11 +139,11 @@ class _ProfileState extends State<Profile> {
           ),
           child: CircleAvatar(
             radius: 50,
-            backgroundColor: const Color(0xFF1A2A40),
+            backgroundColor: AppTheme.bgDark,
             child: Text(
               _initials,
               style: const TextStyle(
-                color: _accent,
+                color: AppTheme.accent,
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
               ),
@@ -200,7 +190,7 @@ class _ProfileState extends State<Profile> {
 
     return Container(
       decoration: BoxDecoration(
-        color: _bgCard,
+        color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.white10),
       ),
@@ -217,7 +207,11 @@ class _ProfileState extends State<Profile> {
                 ),
                 child: Row(
                   children: [
-                    Icon(item['icon'] as IconData, color: _accent, size: 20),
+                    Icon(
+                      item['icon'] as IconData,
+                      color: AppTheme.accent,
+                      size: 20,
+                    ),
                     const SizedBox(width: 14),
                     Text(
                       item['label'] as String,
@@ -250,7 +244,7 @@ class _ProfileState extends State<Profile> {
   Widget _buildPreferences() {
     return Container(
       decoration: BoxDecoration(
-        color: _bgCard,
+        color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.white10),
       ),
@@ -260,21 +254,21 @@ class _ProfileState extends State<Profile> {
             Icons.dark_mode_rounded,
             'Dark Mode',
             _darkMode,
-            (v) => setState(() => _darkMode = v), // Visual only for now
+            (v) => setState(() => _darkMode = v),
           ),
           Divider(color: Colors.white.withOpacity(0.05), height: 1),
           _toggleRow(
             Icons.notifications_rounded,
             'Notifications',
             _notifications,
-            _toggleNotifications, // Uses new persist method
+            _toggleNotifications,
           ),
           Divider(color: Colors.white.withOpacity(0.05), height: 1),
           _toggleRow(
             Icons.straighten_rounded,
             'Metric Units',
             _metricUnits,
-            _toggleMetrics, // Uses new persist method
+            _toggleMetrics,
           ),
         ],
       ),
@@ -291,7 +285,7 @@ class _ProfileState extends State<Profile> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Row(
         children: [
-          Icon(icon, color: _purple, size: 20),
+          Icon(icon, color: AppTheme.purple, size: 20),
           const SizedBox(width: 14),
           Expanded(
             child: Text(
@@ -302,8 +296,8 @@ class _ProfileState extends State<Profile> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: _accent,
-            activeTrackColor: _accent.withOpacity(0.3),
+            activeColor: AppTheme.accent,
+            activeTrackColor: AppTheme.accent.withOpacity(0.3),
             inactiveThumbColor: Colors.white38,
             inactiveTrackColor: Colors.white12,
           ),
@@ -319,9 +313,10 @@ class _ProfileState extends State<Profile> {
       {'icon': Icons.devices_rounded, 'label': 'Connected Devices'},
       {'icon': Icons.health_and_safety_rounded, 'label': 'Health Permissions'},
     ];
+
     return Container(
       decoration: BoxDecoration(
-        color: _bgCard,
+        color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.white10),
       ),
@@ -350,7 +345,11 @@ class _ProfileState extends State<Profile> {
                   ),
                   child: Row(
                     children: [
-                      Icon(item['icon'] as IconData, color: _accent, size: 20),
+                      Icon(
+                        item['icon'] as IconData,
+                        color: AppTheme.accent,
+                        size: 20,
+                      ),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Text(
@@ -387,7 +386,7 @@ class _ProfileState extends State<Profile> {
           final confirm = await showDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(
-              backgroundColor: _bgCard,
+              backgroundColor: AppTheme.bgCard,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
               ),
@@ -402,7 +401,10 @@ class _ProfileState extends State<Profile> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('Cancel', style: TextStyle(color: _accent)),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: AppTheme.accent),
+                  ),
                 ),
                 TextButton(
                   onPressed: () => Navigator.pop(ctx, true),
@@ -414,10 +416,12 @@ class _ProfileState extends State<Profile> {
               ],
             ),
           );
+
           if (confirm == true && mounted) {
             const storage = FlutterSecureStorage();
             await storage.deleteAll(); // Safely wipes all data
             if (!mounted) return;
+
             Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(builder: (_) => const LoginPage()),

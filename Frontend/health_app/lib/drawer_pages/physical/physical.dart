@@ -2,28 +2,20 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import '../../services/watch_service.dart';
 import '../../services/health_database_service.dart';
+import '../../core/theme/app_theme.dart'; // ⚡ NEW: Centralized theme
 
 class Physical extends StatefulWidget {
   const Physical({super.key});
-
   @override
   State<Physical> createState() => _PhysicalState();
 }
 
 class _PhysicalState extends State<Physical>
     with SingleTickerProviderStateMixin {
-  // ── Colors ──
-  static const _bgCard = Color(0xFF152238);
-  static const _accent = Color(0xFF4DD0E1);
-  static const _purple = Color(0xFF7E57C2);
-  static const _green = Color(0xFF66BB6A);
-  static const _orange = Color(0xFFFFB74D);
-
   // ── Dynamic Data State ──
   List<double> _weeklySteps = List.filled(7, 0);
   int _todaySteps = 0;
   bool _isLoading = true;
-
   static const _dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   late AnimationController _animController;
@@ -34,7 +26,7 @@ class _PhysicalState extends State<Physical>
     super.initState();
     WatchService().initialize();
 
-    // ⚡ NEW: Listen to background syncs from the smartwatch!
+    // ⚡ Listen to background syncs from the smartwatch
     WatchService().syncTrigger.addListener(_loadPhysicalData);
 
     _animController = AnimationController(
@@ -49,7 +41,6 @@ class _PhysicalState extends State<Physical>
 
   @override
   void dispose() {
-    // ⚡ Don't forget to remove the listener!
     WatchService().syncTrigger.removeListener(_loadPhysicalData);
     _animController.dispose();
     super.dispose();
@@ -76,16 +67,15 @@ class _PhysicalState extends State<Physical>
         tempTodaySteps += steps;
       }
 
-      // Populate weekly chart (simple check for logs within the last 7 days)
+      // Populate weekly chart
       final difference = now.difference(logDate).inDays;
       if (difference < 7) {
-        // weekday is 1-7 (Mon-Sun). Subtract 1 for 0-6 index.
-        int dayIndex = logDate.weekday - 1;
+        int dayIndex = logDate.weekday - 1; // 0-6 index
         tempWeeklySteps[dayIndex] += steps.toDouble();
       }
     }
 
-    // Prevent completely empty graphs on fresh install by adding a baseline if empty
+    // Prevent completely empty graphs on fresh install
     if (tempWeeklySteps.every((element) => element == 0)) {
       tempWeeklySteps = [3200, 5400, 4320, 6100, 3800, 7200, 4800];
     }
@@ -93,9 +83,7 @@ class _PhysicalState extends State<Physical>
     if (mounted) {
       setState(() {
         _weeklySteps = tempWeeklySteps;
-        _todaySteps = tempTodaySteps > 0
-            ? tempTodaySteps
-            : 4320; // Fallback for UI if 0
+        _todaySteps = tempTodaySteps > 0 ? tempTodaySteps : 4320; // Fallback
         _isLoading = false;
       });
     }
@@ -105,17 +93,18 @@ class _PhysicalState extends State<Physical>
   // 🏃 LOG QUICK WORKOUT
   // ==========================================
   Future<void> _logQuickWalk() async {
-    // Simulates a quick 1,000 step walk
     await HealthDatabaseService.instance.logSteps(1000, 800.0, 45.0);
 
+    // ⚡ OPTIMIZATION: Check mounted before using BuildContext after async gap
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Added 1,000 steps to today\'s log!'),
-        backgroundColor: _accent,
+      const SnackBar(
+        content: Text('Added 1,000 steps to today\'s log!'),
+        backgroundColor: AppTheme.accent,
         behavior: SnackBarBehavior.floating,
       ),
     );
-
     _loadPhysicalData();
   }
 
@@ -127,17 +116,19 @@ class _PhysicalState extends State<Physical>
   }
 
   Color _getStatusColor(int bpm) {
-    if (bpm <= 85) return _green;
-    if (bpm <= 120) return _orange;
-    return Colors.redAccent;
+    if (bpm <= 85) return AppTheme.green;
+    if (bpm <= 120) return AppTheme.orange;
+    return AppTheme.red;
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Container(
-        color: const Color(0xFF0D1B2A),
-        child: const Center(child: CircularProgressIndicator(color: _accent)),
+        color: AppTheme.bgDark,
+        child: const Center(
+          child: CircularProgressIndicator(color: AppTheme.accent),
+        ),
       );
     }
 
@@ -145,76 +136,70 @@ class _PhysicalState extends State<Physical>
       opacity: _fadeAnim,
       child: Container(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF0B1527), Color(0xFF0D1B2A), Color(0xFF132E4A)],
-          ),
+          gradient: AppTheme.mainBackgroundGradient, // ⚡ Centralized theme
         ),
         child: SafeArea(
-          child: SingleChildScrollView(
+          // ⚡ OPTIMIZATION: Replaced SingleChildScrollView with ListView
+          child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Physical Health',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                          ),
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Physical Health',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Monitor your activity & vitals',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.5),
-                            fontSize: 15,
-                          ),
-                        ),
-                      ],
-                    ),
-                    IconButton(
-                      onPressed: _logQuickWalk,
-                      icon: const Icon(
-                        Icons.add_circle,
-                        color: _accent,
-                        size: 32,
                       ),
-                      tooltip: 'Log 1,000 Steps',
+                      const SizedBox(height: 4),
+                      Text(
+                        'Monitor your activity & vitals',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.5),
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    onPressed: _logQuickWalk,
+                    icon: const Icon(
+                      Icons.add_circle,
+                      color: AppTheme.accent,
+                      size: 32,
                     ),
-                  ],
-                ),
-                const SizedBox(height: 24),
+                    tooltip: 'Log 1,000 Steps',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
 
-                _buildSectionTitle('Activity Summary'),
-                const SizedBox(height: 14),
-                _buildActivityCards(),
-                const SizedBox(height: 28),
+              _buildSectionTitle('Activity Summary'),
+              const SizedBox(height: 14),
+              _buildActivityCards(),
+              const SizedBox(height: 28),
 
-                _buildSectionTitle('Heart Rate'),
-                const SizedBox(height: 14),
-                _buildHeartRateCard(),
-                const SizedBox(height: 28),
+              _buildSectionTitle('Heart Rate'),
+              const SizedBox(height: 14),
+              _buildHeartRateCard(),
+              const SizedBox(height: 28),
 
-                _buildSectionTitle('Workout Suggestions'),
-                const SizedBox(height: 14),
-                _buildWorkoutSuggestions(),
-                const SizedBox(height: 28),
+              _buildSectionTitle('Workout Suggestions'),
+              const SizedBox(height: 14),
+              _buildWorkoutSuggestions(),
+              const SizedBox(height: 28),
 
-                _buildSectionTitle('Weekly Activity'),
-                const SizedBox(height: 14),
-                _buildWeeklyGraph(),
-                const SizedBox(height: 32),
-              ],
-            ),
+              _buildSectionTitle('Weekly Activity'),
+              const SizedBox(height: 14),
+              _buildWeeklyGraph(),
+              const SizedBox(height: 32),
+            ],
           ),
         ),
       ),
@@ -229,7 +214,7 @@ class _PhysicalState extends State<Physical>
             Icons.directions_walk_rounded,
             'Steps',
             '$_todaySteps',
-            _accent,
+            AppTheme.accent,
           ),
         ),
         const SizedBox(width: 12),
@@ -238,7 +223,7 @@ class _PhysicalState extends State<Physical>
             Icons.local_fire_department_rounded,
             'Calories',
             '${(_todaySteps * 0.04).round()} kcal',
-            _orange,
+            AppTheme.orange,
           ),
         ),
         const SizedBox(width: 12),
@@ -247,7 +232,7 @@ class _PhysicalState extends State<Physical>
             Icons.timer_rounded,
             'Active',
             '${(_todaySteps / 100).round()} min',
-            _green,
+            AppTheme.green,
           ),
         ),
       ],
@@ -258,7 +243,7 @@ class _PhysicalState extends State<Physical>
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 10),
       decoration: BoxDecoration(
-        color: _bgCard,
+        color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: color.withOpacity(0.2)),
       ),
@@ -306,7 +291,7 @@ class _PhysicalState extends State<Physical>
         return Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: _bgCard,
+            color: AppTheme.bgCard,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: Colors.white10),
           ),
@@ -317,12 +302,12 @@ class _PhysicalState extends State<Physical>
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.12),
+                      color: AppTheme.red.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
                       Icons.favorite_rounded,
-                      color: Colors.redAccent,
+                      color: AppTheme.red,
                       size: 24,
                     ),
                   ),
@@ -430,21 +415,22 @@ class _PhysicalState extends State<Physical>
         'icon': Icons.self_improvement,
         'title': 'Morning Stretch',
         'desc': '10 min · Flexibility',
-        'color': _accent,
+        'color': AppTheme.accent,
       },
       {
         'icon': Icons.spa_rounded,
         'title': 'Yoga',
         'desc': '20 min · Balance',
-        'color': _purple,
+        'color': AppTheme.purple,
       },
       {
         'icon': Icons.directions_run_rounded,
         'title': 'Light Cardio',
         'desc': '15 min · Endurance',
-        'color': _orange,
+        'color': AppTheme.orange,
       },
     ];
+
     return Column(
       children: workouts.map((w) {
         final c = w['color'] as Color;
@@ -452,7 +438,7 @@ class _PhysicalState extends State<Physical>
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: _bgCard,
+            color: AppTheme.bgCard,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: c.withOpacity(0.2)),
           ),
@@ -505,7 +491,7 @@ class _PhysicalState extends State<Physical>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: _bgCard,
+        color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white10),
       ),
@@ -519,13 +505,14 @@ class _PhysicalState extends State<Physical>
               children: List.generate(7, (i) {
                 final pct = _weeklySteps[i] / safeMax;
                 final isToday = i == DateTime.now().weekday - 1;
+
                 return Column(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     Text(
                       '${(_weeklySteps[i] / 1000).toStringAsFixed(1)}k',
                       style: TextStyle(
-                        color: isToday ? _accent : Colors.white38,
+                        color: isToday ? AppTheme.accent : Colors.white38,
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                       ),
@@ -539,17 +526,20 @@ class _PhysicalState extends State<Physical>
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: isToday
-                              ? [_accent, _accent.withOpacity(0.4)]
+                              ? [
+                                  AppTheme.accent,
+                                  AppTheme.accent.withOpacity(0.4),
+                                ]
                               : [
-                                  _purple.withOpacity(0.7),
-                                  _purple.withOpacity(0.3),
+                                  AppTheme.purple.withOpacity(0.7),
+                                  AppTheme.purple.withOpacity(0.3),
                                 ],
                         ),
                         borderRadius: BorderRadius.circular(10),
                         boxShadow: isToday
                             ? [
                                 BoxShadow(
-                                  color: _accent.withOpacity(0.3),
+                                  color: AppTheme.accent.withOpacity(0.3),
                                   blurRadius: 8,
                                 ),
                               ]
@@ -569,7 +559,7 @@ class _PhysicalState extends State<Physical>
               return Text(
                 _dayLabels[i],
                 style: TextStyle(
-                  color: isToday ? _accent : Colors.white54,
+                  color: isToday ? AppTheme.accent : Colors.white54,
                   fontSize: 12,
                   fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
                 ),
@@ -603,12 +593,14 @@ class _HeartRateGraphPainter extends CustomPainter {
     final minVal = data.reduce(math.min).toDouble() - 5;
     final maxVal = data.reduce(math.max).toDouble() + 5;
     final range = maxVal == minVal ? 1.0 : maxVal - minVal;
+
     final path = Path();
     final fillPath = Path();
 
     for (int i = 0; i < data.length; i++) {
       final x = (i / (data.length - 1)) * size.width;
       final y = size.height - ((data[i] - minVal) / range) * size.height;
+
       if (i == 0) {
         path.moveTo(x, y);
         fillPath.moveTo(x, size.height);
@@ -629,27 +621,23 @@ class _HeartRateGraphPainter extends CustomPainter {
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [
-          Colors.redAccent.withOpacity(0.25),
-          Colors.redAccent.withOpacity(0.0),
-        ],
+        colors: [AppTheme.red.withOpacity(0.25), AppTheme.red.withOpacity(0.0)],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
     canvas.drawPath(fillPath, fillPaint);
+
     final linePaint = Paint()
-      ..color = Colors.redAccent
+      ..color = AppTheme.red
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5
       ..strokeCap = StrokeCap.round;
+
     canvas.drawPath(path, linePaint);
 
     if (data.length > 1) {
       final lastX = size.width;
       final lastY = size.height - ((data.last - minVal) / range) * size.height;
-      canvas.drawCircle(
-        Offset(lastX, lastY),
-        5,
-        Paint()..color = Colors.redAccent,
-      );
+      canvas.drawCircle(Offset(lastX, lastY), 5, Paint()..color = AppTheme.red);
       canvas.drawCircle(Offset(lastX, lastY), 3, Paint()..color = Colors.white);
     }
   }

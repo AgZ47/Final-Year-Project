@@ -1,14 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import '../services/wellness_engine.dart';
-
-// ── Design Constants ────────────────────────────────────────────────────────
-const _bgCard = Color(0xFF152238);
-const _accent = Color(0xFF4DD0E1);
-const _purple = Color(0xFF7E57C2);
-const _green = Color(0xFF66BB6A);
-const _orange = Color(0xFFFFB74D);
-const _red = Color(0xFFEF5350);
+import '../core/theme/app_theme.dart'; // ⚡ NEW: Centralized theme
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. WellnessScoreCard
@@ -33,12 +26,15 @@ class WellnessScoreCard extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [_accent.withOpacity(0.12), _purple.withOpacity(0.1)],
+          colors: [
+            AppTheme.accent.withOpacity(0.12),
+            AppTheme.purple.withOpacity(0.1),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: _accent.withOpacity(0.2)),
+        border: Border.all(color: AppTheme.accent.withOpacity(0.2)),
       ),
       child: Column(
         children: [
@@ -70,12 +66,15 @@ class WellnessScoreCard extends StatelessWidget {
 
   Widget _trendBadge(String trend) {
     final isGood = trend == 'Improving';
-    final color = isGood ? _green : (trend == 'Stable' ? _accent : _orange);
+    final color = isGood
+        ? AppTheme.green
+        : (trend == 'Stable' ? AppTheme.accent : AppTheme.orange);
     final icon = isGood
         ? Icons.trending_up_rounded
         : (trend == 'Stable'
               ? Icons.trending_flat_rounded
               : Icons.trending_down_rounded);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
@@ -104,6 +103,7 @@ class WellnessScoreCard extends StatelessWidget {
 class _GradientRingPainter extends CustomPainter {
   final double progress;
   final int score;
+
   _GradientRingPainter({required this.progress, required this.score});
 
   @override
@@ -134,11 +134,11 @@ class _GradientRingPainter extends CustomPainter {
           startAngle: -math.pi / 2,
           endAngle: 3 * math.pi / 2,
           colors: const [
-            Color(0xFF4DD0E1),
-            Color(0xFF66BB6A),
-            Color(0xFFFFD54F),
-            Color(0xFF7E57C2),
-            Color(0xFF4DD0E1),
+            AppTheme.accent,
+            AppTheme.green,
+            AppTheme.gold,
+            AppTheme.purple,
+            AppTheme.accent,
           ],
         ).createShader(rect),
     );
@@ -154,6 +154,7 @@ class _GradientRingPainter extends CustomPainter {
       ),
       textDirection: TextDirection.ltr,
     )..layout();
+
     tp.paint(
       canvas,
       Offset(center.dx - tp.width / 2, center.dy - tp.height / 2 - 4),
@@ -166,6 +167,7 @@ class _GradientRingPainter extends CustomPainter {
       ),
       textDirection: TextDirection.ltr,
     )..layout();
+
     sub.paint(
       canvas,
       Offset(center.dx - sub.width / 2, center.dy + tp.height / 2 - 6),
@@ -189,11 +191,11 @@ class HealthAlertCard extends StatelessWidget {
   Color get _severityColor {
     switch (alert.severity) {
       case AlertSeverity.high:
-        return _red;
+        return AppTheme.red;
       case AlertSeverity.medium:
-        return _orange;
+        return AppTheme.orange;
       case AlertSeverity.low:
-        return _accent;
+        return AppTheme.accent;
     }
   }
 
@@ -203,7 +205,7 @@ class HealthAlertCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _bgCard,
+        color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _severityColor.withOpacity(0.3)),
       ),
@@ -275,10 +277,10 @@ class HabitTrackerCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: completed ? _accent.withOpacity(0.08) : _bgCard,
+        color: completed ? AppTheme.accent.withOpacity(0.08) : AppTheme.bgCard,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: completed ? _accent.withOpacity(0.3) : Colors.white10,
+          color: completed ? AppTheme.accent.withOpacity(0.3) : Colors.white10,
         ),
       ),
       child: Row(
@@ -290,15 +292,15 @@ class HabitTrackerCard extends StatelessWidget {
               width: 28,
               height: 28,
               decoration: BoxDecoration(
-                color: completed ? _accent : Colors.transparent,
+                color: completed ? AppTheme.accent : Colors.transparent,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: completed ? _accent : Colors.white30,
+                  color: completed ? AppTheme.accent : Colors.white30,
                   width: 2,
                 ),
               ),
               child: completed
-                  ? const Icon(Icons.check, color: Color(0xFF0D1B2A), size: 18)
+                  ? const Icon(Icons.check, color: AppTheme.bgDark, size: 18)
                   : null,
             ),
           ),
@@ -320,7 +322,7 @@ class HabitTrackerCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: _orange.withOpacity(0.12),
+                color: AppTheme.orange.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -331,7 +333,7 @@ class HabitTrackerCard extends StatelessWidget {
                   Text(
                     '$streak',
                     style: const TextStyle(
-                      color: _orange,
+                      color: AppTheme.orange,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -364,13 +366,13 @@ class GoalProgressCard extends StatelessWidget {
   Color get _categoryColor {
     switch (goal.category) {
       case 'sleep':
-        return const Color(0xFF5C6BC0);
+        return AppTheme.indigo;
       case 'activity':
-        return _green;
+        return AppTheme.green;
       case 'mental':
-        return _purple;
+        return AppTheme.purple;
       default:
-        return _accent;
+        return AppTheme.accent;
     }
   }
 
@@ -393,7 +395,7 @@ class GoalProgressCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _bgCard,
+        color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: _categoryColor.withOpacity(0.2)),
       ),
@@ -518,9 +520,9 @@ class InsightCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: _bgCard,
+        color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _purple.withOpacity(0.2)),
+        border: Border.all(color: AppTheme.purple.withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -530,10 +532,14 @@ class InsightCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: _purple.withOpacity(0.12),
+                  color: AppTheme.purple.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.auto_awesome, color: _purple, size: 18),
+                child: const Icon(
+                  Icons.auto_awesome,
+                  color: AppTheme.purple,
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -549,13 +555,13 @@ class InsightCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: _accent.withOpacity(0.1),
+                  color: AppTheme.accent.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   '${(insight.confidence * 100).round()}%',
                   style: const TextStyle(
-                    color: _accent,
+                    color: AppTheme.accent,
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                   ),
@@ -593,9 +599,9 @@ class RecoveryScoreCard extends StatelessWidget {
   });
 
   Color get _scoreColor {
-    if (score >= 75) return _green;
-    if (score >= 50) return _orange;
-    return _red;
+    if (score >= 75) return AppTheme.green;
+    if (score >= 50) return AppTheme.orange;
+    return AppTheme.red;
   }
 
   @override
@@ -603,7 +609,7 @@ class RecoveryScoreCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: _bgCard,
+        color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: _scoreColor.withOpacity(0.25)),
       ),
@@ -711,7 +717,7 @@ class ReportChartCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: _bgCard,
+        color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.white10),
       ),
@@ -732,7 +738,8 @@ class ReportChartCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: (isPositive ? _green : _red).withOpacity(0.12),
+                  color: (isPositive ? AppTheme.green : AppTheme.red)
+                      .withOpacity(0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -742,14 +749,14 @@ class ReportChartCard extends StatelessWidget {
                       isPositive
                           ? Icons.arrow_upward_rounded
                           : Icons.arrow_downward_rounded,
-                      color: isPositive ? _green : _red,
+                      color: isPositive ? AppTheme.green : AppTheme.red,
                       size: 12,
                     ),
                     const SizedBox(width: 3),
                     Text(
                       improvement,
                       style: TextStyle(
-                        color: isPositive ? _green : _red,
+                        color: isPositive ? AppTheme.green : AppTheme.red,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
@@ -778,7 +785,10 @@ class ReportChartCard extends StatelessWidget {
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: isToday
-                              ? [_accent, _accent.withOpacity(0.3)]
+                              ? [
+                                  AppTheme.accent,
+                                  AppTheme.accent.withOpacity(0.3),
+                                ]
                               : [color, color.withOpacity(0.3)],
                         ),
                         borderRadius: BorderRadius.circular(7),
@@ -789,7 +799,7 @@ class ReportChartCard extends StatelessWidget {
                       labels[i],
                       style: TextStyle(
                         fontSize: 10,
-                        color: isToday ? _accent : Colors.white38,
+                        color: isToday ? AppTheme.accent : Colors.white38,
                         fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
                       ),
                     ),
