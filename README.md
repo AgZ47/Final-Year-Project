@@ -22,7 +22,6 @@
 ## Phase 4: The "AI Brain"
 
 - <ins>**_Goal:_**</ins> Add the RAG and LLM.\
-- <ins>**_Backend:_**</ins> When a journal comes in, vectorise it (using an embedding API) and store it in ChromaDB.\
 - <ins>**_Backend:_**</ins> Update the Daily Plan generator to query ChromaDB for context ("What did the user do last time they were stressed?") before asking the LLM for advice.\
 
 # How to section:
